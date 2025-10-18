@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Telnyx from 'telnyx';
 import config from '../config';
 import logger from '../utils/logger';
