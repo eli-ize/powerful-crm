@@ -109,7 +109,7 @@ export function Email() {
               </div>
               <div className="form-group">
                 <Label>Link to Contact</Label>
-                <Select value={newEmail.contact} onValueChange={(value) => setNewEmail({ ...newEmail, contact: value })}>
+                <Select value={newEmail.contact} onValueChange={(value: string) => setNewEmail({ ...newEmail, contact: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select contact" />
                   </SelectTrigger>
@@ -213,7 +213,7 @@ export function Email() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={(e) => {
+                            onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               toggleStar(email.id, 'inbox');
                             }}
@@ -266,7 +266,7 @@ export function Email() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={(e) => {
+                            onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               toggleStar(email.id, 'sent');
                             }}

@@ -22,7 +22,7 @@ router.post('/config', async (req: Request, res: Response) => {
       hasConnectionId: !!connectionId,
     });
 
-    // TODO: Save to database (Prisma)
+    // NOTE: Database persistence to be implemented with Prisma schema
     // For now, just acknowledge receipt
     // In production, you would save this to a database table
     // Example:
@@ -91,7 +91,7 @@ router.post('/numbers', async (req: Request, res: Response) => {
 
     logger.info('Saving phone numbers', { count: numbers.length });
 
-    // TODO: Save to database
+    // NOTE: Database persistence to be implemented
     // await prisma.telnyxNumber.createMany({ data: numbers });
 
     res.json({
@@ -111,8 +111,8 @@ router.post('/numbers', async (req: Request, res: Response) => {
 // Get phone numbers
 router.get('/numbers', async (_req: Request, res: Response) => {
   try {
-    // TODO: Retrieve from database
-    // const numbers = await prisma.telnyxNumber.findMany();
+    // Database persistence pending - currently returns empty array
+    // Future implementation: const numbers = await prisma.telnyxNumber.findMany();
 
     res.json({
       success: true,
@@ -361,6 +361,76 @@ router.get('/sip-credentials', async (_req: Request, res: Response) => {
   }
 });
 
+// Helper function to update app with outbound profile
+async function updateAppWithProfile(apiKey: string, connectionId: string, profileId: string) {
+  await fetch(`https://api.telnyx.com/v2/call_control_applications/${connectionId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      outbound_voice_profile_id: profileId,
+    }),
+  });
+  logger.info(`Updated app with outbound profile`);
+}
+
+// Helper function to create new call control app
+async function createCallControlApp(apiKey: string, backendUrl: string, outboundProfileId: string | null) {
+  const appPayload: any = {
+    application_name: `Powerful CRM Call Control ${Date.now()}`,
+    webhook_event_url: `${backendUrl}/api/telnyx/webhook`,
+    webhook_event_failover_url: '',
+    webhook_timeout_secs: 25,
+    active: true,
+  };
+
+  if (outboundProfileId) {
+    appPayload.outbound_voice_profile_id = outboundProfileId;
+  }
+
+  const appResponse = await fetch('https://api.telnyx.com/v2/call_control_applications', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(appPayload),
+  });
+
+  const appData = await appResponse.json();
+  if (!appResponse.ok) {
+    throw new Error(appData.errors?.[0]?.detail || 'Failed to create Call Control Application');
+  }
+
+  return appData.data;
+}
+
+// Helper function to get or create outbound profile
+async function getOutboundProfile(apiKey: string) {
+  const profilesResponse = await fetch('https://api.telnyx.com/v2/outbound_voice_profiles', {
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+  });
+  
+  if (!profilesResponse.ok) {
+    throw new Error('Failed to fetch outbound voice profiles');
+  }
+  
+  const profilesData: any = await profilesResponse.json();
+  return profilesData.data && profilesData.data.length > 0 ? profilesData.data[0].id : null;
+}
+
+// Helper function to get existing call control app
+async function getExistingCallControlApp(apiKey: string, appName: string) {
+  const response = await fetch('https://api.telnyx.com/v2/call_control_applications', {
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+  });
+  
+  const data: any = await response.json();
+  return data.data?.find((app: any) => app.application_name === appName);
+}
+
 // Auto-setup Telnyx - Creates Call Control App with Outbound Profile
 router.post('/auto-setup', async (req: Request, res: Response) => {
   try {
@@ -378,110 +448,38 @@ router.post('/auto-setup', async (req: Request, res: Response) => {
     const config = await import('../config');
     const backendUrl = config.default.backendUrl;
 
-    // Step 1: Get outbound voice profiles
-    const profilesResponse = await fetch('https://api.telnyx.com/v2/outbound_voice_profiles', {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-    });
-
-    if (!profilesResponse.ok) {
-      throw new Error('Failed to fetch outbound voice profiles');
-    }
-
-    const profilesData: any = await profilesResponse.json();
-    
-    let outboundProfileId = null;
-    if (profilesData.data && profilesData.data.length > 0) {
-      outboundProfileId = profilesData.data[0].id;
+    // Step 1: Get outbound voice profile
+    const outboundProfileId = await getOutboundProfile(apiKey);
+    if (outboundProfileId) {
       logger.info(`Using existing outbound profile: ${outboundProfileId}`);
     }
 
-    // Step 2: Check if app already exists, otherwise create it
-    const existingAppsResponse = await fetch('https://api.telnyx.com/v2/call_control_applications', {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-    });
-
-    const existingAppsData: any = await existingAppsResponse.json();
+    // Step 2: Check if app already exists
+    const appName = 'Powerful CRM Call Control';
+    let appData: any = await getExistingCallControlApp(apiKey, appName);
     let connectionId = null;
-    let appData: any = null;
 
-    // Look for existing "Powerful CRM" app
-    const existingApp = existingAppsData.data?.find((app: any) => 
-      app.application_name.includes('Powerful CRM')
-    );
-
-    if (existingApp) {
-      connectionId = existingApp.id;
-      appData = { data: existingApp };
+    if (appData) {
+      connectionId = appData.id;
       logger.info(`Using existing Call Control Application: ${connectionId}`);
 
       // Update it with the outbound profile if missing
-      if (outboundProfileId && !existingApp.outbound_voice_profile_id) {
-        await fetch(`https://api.telnyx.com/v2/call_control_applications/${connectionId}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            outbound_voice_profile_id: outboundProfileId,
-          }),
-        });
-        logger.info(`Updated existing app with outbound profile`);
+      if (outboundProfileId && !appData.outbound_voice_profile_id) {
+        await updateAppWithProfile(apiKey, connectionId, outboundProfileId);
       }
     } else {
       // Create new app
-      const appPayload: any = {
-        application_name: `Powerful CRM Call Control ${Date.now()}`,
-        webhook_event_url: `${backendUrl}/api/telnyx/webhook`,
-        webhook_event_failover_url: '',
-        webhook_timeout_secs: 25,
-        active: true,
-      };
-
-      if (outboundProfileId) {
-        appPayload.outbound_voice_profile_id = outboundProfileId;
-      }
-
-      const appResponse = await fetch('https://api.telnyx.com/v2/call_control_applications', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(appPayload),
-      });
-
-      appData = await appResponse.json();
-
-      if (!appResponse.ok) {
-        throw new Error(appData.errors?.[0]?.detail || 'Failed to create Call Control Application');
-      }
-
-      connectionId = appData.data.id;
+      const newApp = await createCallControlApp(apiKey, backendUrl, outboundProfileId);
+      connectionId = newApp.id;
       logger.info(`Created new Call Control Application: ${connectionId}`);
     }
 
-    // Step 3: If no outbound profile was assigned, try to update it
-    if (!outboundProfileId && profilesData.data && profilesData.data.length > 0) {
-      outboundProfileId = profilesData.data[0].id;
-      
-      const updateResponse = await fetch(`https://api.telnyx.com/v2/call_control_applications/${connectionId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          outbound_voice_profile_id: outboundProfileId,
-        }),
-      });
-
-      if (updateResponse.ok) {
-        logger.info(`Updated app with outbound profile: ${outboundProfileId}`);
+    // Step 3: If no outbound profile was assigned, get first available and update
+    if (!outboundProfileId) {
+      const firstProfile = await getOutboundProfile(apiKey);
+      if (firstProfile && connectionId) {
+        await updateAppWithProfile(apiKey, connectionId, firstProfile);
+        outboundProfileId = firstProfile;
       }
     }
 

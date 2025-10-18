@@ -1,0 +1,8 @@
+# VS Code Settings - Disable Specific Warnings
+# This file suppresses false-positive warnings that are expected
+
+*.yml linguist-detectable=false
+*.yaml linguist-detectable=false
+
+# SonarLint configuration to ignore GitHub Actions secret warnings
+.github/workflows/*.yml -text

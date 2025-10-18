@@ -40,7 +40,7 @@ export interface ConversationContext {
 }
 
 export class AzureOpenAIService {
-  private client: OpenAI | null = null;
+  private readonly client: OpenAI | null = null;
 
   constructor() {
     if (config.azureOpenAIKey && config.azureOpenAIEndpoint) {
@@ -188,7 +188,8 @@ Remember: You're on a phone call. Be natural, conversational, and concise.`;
     currentStage: string
   ): { response: string; nextStage: string; confidence: number } {
     // Extract stage and confidence from response
-    const stageMatch = response.match(/\[STAGE:(\w+)\|CONFIDENCE:([\d.]+)\]/);
+    const regex = /\[STAGE:(\w+)\|CONFIDENCE:([\d.]+)\]/;
+    const stageMatch = regex.exec(response);
     
     let nextStage = currentStage;
     let confidence = 0.5;
@@ -196,7 +197,7 @@ Remember: You're on a phone call. Be natural, conversational, and concise.`;
 
     if (stageMatch) {
       nextStage = stageMatch[1];
-      confidence = parseFloat(stageMatch[2]);
+      confidence = Number.parseFloat(stageMatch[2]);
       cleanResponse = response.replace(/\[STAGE:.*?\]/, '').trim();
     }
 

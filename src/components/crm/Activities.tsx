@@ -110,7 +110,7 @@ export function Activities() {
               </div>
               <div>
                 <Label>Type *</Label>
-                <Select value={newActivity.type} onValueChange={(value) => setNewActivity({ ...newActivity, type: value as Activity['type'] })}>
+                <Select value={newActivity.type} onValueChange={(value: string) => setNewActivity({ ...newActivity, type: value as Activity['type'] })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>

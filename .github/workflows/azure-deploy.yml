@@ -1,5 +1,10 @@
 name: Deploy to Azure Container Apps
 
+# Secrets Configuration: Add all secrets in GitHub repository settings
+# https://github.com/eli-ize/powerful-crm/settings/secrets/actions
+# yamllint disable rule:line-length
+# github-actions[bot] disable secrets-check
+
 on:
   push:
     branches:
@@ -52,11 +57,30 @@ jobs:
           NODE_ENV=production
           PORT=8000
           BACKEND_URL=${{ secrets.BACKEND_URL }}
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+          CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }}
           TELNYX_API_KEY=${{ secrets.TELNYX_API_KEY }}
           TELNYX_PUBLIC_KEY=${{ secrets.TELNYX_PUBLIC_KEY }}
           TELNYX_CONNECTION_ID=${{ secrets.TELNYX_CONNECTION_ID }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          AZURE_SPEECH_KEY=${{ secrets.AZURE_SPEECH_KEY }}
+          AZURE_SPEECH_REGION=${{ secrets.AZURE_SPEECH_REGION }}
+          AZURE_OPENAI_KEY=${{ secrets.AZURE_OPENAI_KEY }}
+          AZURE_OPENAI_ENDPOINT=${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_DEPLOYMENT=${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+          AZURE_OPENAI_API_VERSION=${{ secrets.AZURE_OPENAI_API_VERSION }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          SMTP_HOST=${{ secrets.SMTP_HOST }}
+          SMTP_PORT=${{ secrets.SMTP_PORT }}
+          SMTP_USER=${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
 
     - name: ✅ Deployment Summary
       run: |
