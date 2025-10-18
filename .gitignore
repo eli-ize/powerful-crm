@@ -42,6 +42,9 @@ coverage/
 
 # Azure deployment sensitive info
 azure-deployment-info.txt
+setup-github-secrets*.ps1
+show-secrets.ps1
+backend/.env.backup*
 
 # Database
 *.db
