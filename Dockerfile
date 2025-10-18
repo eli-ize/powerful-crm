@@ -31,6 +31,12 @@ COPY backend/tsconfig.json ./
 # Install backend dependencies
 RUN npm ci
 
+# Copy prisma schema
+COPY backend/prisma ./prisma
+
+# Generate Prisma client
+RUN npx prisma generate
+
 # Copy backend source
 COPY backend/src ./src
 
@@ -45,6 +51,10 @@ WORKDIR /app
 # Install production dependencies for backend
 COPY backend/package*.json ./
 RUN npm ci --only=production
+
+# Copy prisma schema and generate client for production
+COPY backend/prisma ./prisma
+RUN npx prisma generate
 
 # Copy built backend from build stage
 COPY --from=backend-build /app/backend/dist ./dist
