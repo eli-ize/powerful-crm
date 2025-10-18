@@ -61,6 +61,7 @@ jobs:
             TELNYX_PUBLIC_KEY=${{ secrets.TELNYX_PUBLIC_KEY }} \
             TELNYX_CONNECTION_ID=${{ secrets.TELNYX_CONNECTION_ID }} \
             JWT_SECRET=${{ secrets.JWT_SECRET }} \
+            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }} \
             DATABASE_URL=${{ secrets.DATABASE_URL }}
 
     - name: ✅ Deployment Summary
