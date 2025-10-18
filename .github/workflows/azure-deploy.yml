@@ -62,7 +62,11 @@ jobs:
             TELNYX_CONNECTION_ID=${{ secrets.TELNYX_CONNECTION_ID }} \
             JWT_SECRET=${{ secrets.JWT_SECRET }} \
             JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }} \
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }} \
+            AI_PROVIDER=auto \
+            AI_FALLBACK_ENABLED=true \
+            GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }}
 
     - name: ✅ Deployment Summary
       run: |
