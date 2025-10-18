@@ -1,0 +1,345 @@
+/* Design System - Consistent UI Standards */
+
+/* ============================================
+   SPACING & LAYOUT
+   ============================================ */
+:root {
+  /* Consistent container padding */
+  --container-padding-mobile: 0.75rem;
+  --container-padding-tablet: 1rem;
+  --container-padding-desktop: 1.5rem;
+  
+  /* Consistent gaps */
+  --gap-xs: 0.5rem;
+  --gap-sm: 0.75rem;
+  --gap-md: 1rem;
+  --gap-lg: 1.5rem;
+  --gap-xl: 2rem;
+  
+  /* Card spacing */
+  --card-padding: 1.5rem;
+  --card-gap: 1rem;
+}
+
+/* ============================================
+   CONTAINERS
+   ============================================ */
+.page-container {
+  width: 100%;
+  max-width: 100%;
+  padding: var(--container-padding-mobile);
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+@media (min-width: 768px) {
+  .page-container {
+    padding: var(--container-padding-tablet);
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-container {
+    padding: var(--container-padding-desktop);
+  }
+}
+
+.content-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ============================================
+   CARDS
+   ============================================ */
+.card-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.card-content-responsive {
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+@media (min-width: 768px) {
+  .card-content-responsive {
+    padding: 1.5rem;
+  }
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+.btn-responsive {
+  min-height: 40px;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+}
+
+@media (min-width: 768px) {
+  .btn-responsive {
+    min-height: 42px;
+    padding: 0.625rem 1.25rem;
+  }
+}
+
+.btn-group-responsive {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .btn-group-responsive button {
+    flex: 1 1 auto;
+    min-width: 120px;
+  }
+}
+
+/* ============================================
+   FORMS
+   ============================================ */
+.form-row-responsive {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .form-row-responsive {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .form-row-responsive {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ============================================
+   GRIDS
+   ============================================ */
+.grid-responsive {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .grid-responsive {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid-responsive {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .grid-responsive {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Two column grid */
+.grid-2-col-responsive {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .grid-2-col-responsive {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ============================================
+   TABLES
+   ============================================ */
+.table-responsive-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive {
+  min-width: 640px;
+  width: 100%;
+}
+
+/* ============================================
+   TEXT TRUNCATION
+   ============================================ */
+.truncate-responsive {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .truncate-responsive {
+    max-width: 150px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .truncate-responsive {
+    max-width: 250px;
+  }
+}
+
+/* ============================================
+   MODALS & DIALOGS
+   ============================================ */
+.dialog-responsive {
+  width: calc(100vw - 2rem);
+  max-width: 600px;
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .dialog-responsive {
+    width: calc(100vw - 1rem);
+    max-height: calc(100vh - 2rem);
+  }
+}
+
+/* ============================================
+   BADGES & TAGS
+   ============================================ */
+.badge-responsive {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .badge-responsive {
+    font-size: 0.6875rem;
+    padding: 0.1875rem 0.5rem;
+  }
+}
+
+/* ============================================
+   HEADERS & TITLES
+   ============================================ */
+.page-header-responsive {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .page-header-responsive {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+  }
+}
+
+.section-header-responsive {
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .section-header-responsive {
+    margin-bottom: 1.5rem;
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+.mobile-only {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none;
+  }
+}
+
+.desktop-only {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .desktop-only {
+    display: block;
+  }
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================
+   FOCUS & INTERACTION STATES
+   ============================================ */
+.focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color 0.15s ease;
+}
+
+.focus-ring:focus-visible {
+  outline-color: hsl(var(--ring));
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+.skeleton-box {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted) / 0.5) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ============================================
+   SAFE AREAS (iOS/Android)
+   ============================================ */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}

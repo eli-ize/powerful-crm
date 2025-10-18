@@ -1,0 +1,81 @@
+# Development Docker Compose
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: crm-postgres
+    environment:
+      POSTGRES_USER: crmuser
+      POSTGRES_PASSWORD: crmpass
+      POSTGRES_DB: powerfulcrm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crmuser -d powerfulcrm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and job queues
+  redis:
+    image: redis:7-alpine
+    container_name: crm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (development mode)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: crm-backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://crmuser:crmpass@postgres:5432/powerfulcrm
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: your-super-secret-jwt-key-min-32-chars-long-dev
+      JWT_REFRESH_SECRET: your-super-secret-refresh-key-min-32-chars-long-dev
+      FRONTEND_URL: http://localhost:3000
+      CORS_ORIGIN: http://localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run dev
+
+  # Frontend (development mode)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: crm-frontend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
