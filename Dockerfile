@@ -15,9 +15,8 @@ RUN npm ci
 
 # Copy frontend source
 COPY src ./src
-COPY public ./public
 
-# Build frontend
+# Build frontend (no public folder needed - Vite creates it)
 RUN npm run build
 
 # Stage 2: Build Backend
