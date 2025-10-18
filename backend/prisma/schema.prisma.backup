@@ -1,12 +1,13 @@
-// Azure SQL Server compatible schema
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider          = "sqlserver"
-  url               = env("DATABASE_URL")
-  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // User Management & Authentication
@@ -15,7 +16,7 @@ model User {
   email     String   @unique
   name      String
   password  String
-  role      String   @default("SALES_REP") // SUPER_ADMIN, ADMIN, MANAGER, SALES_REP, VIEWER
+  role      UserRole @default(SALES_REP)
   avatar    String?
   company   String?
   phone     String?
@@ -24,8 +25,8 @@ model User {
   updatedAt DateTime @updatedAt
   lastLogin DateTime?
 
-  // Permissions stored as JSON string
-  permissions String @default("{}")
+  // Permissions
+  permissions Json // Store permissions object as JSON
 
   // Relationships
   contacts        Contact[]
@@ -55,9 +56,17 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  SALES_REP
+  VIEWER
+}
+
 // CRM Core Entities
 model Contact {
-  id          String   @id @default(uuid())
+  id          String        @id @default(uuid())
   firstName   String
   lastName    String
   email       String?
@@ -68,10 +77,10 @@ model Contact {
   industry    String?
   location    String?
   source      String?
-  status      String   @default("NEW") // NEW, CONTACTED, QUALIFIED, etc.
-  score       Int?     @default(0)
-  tags        String?  // Comma-separated tags
-  customFields String? // JSON string
+  status      ContactStatus @default(NEW)
+  score       Int?          @default(0)
+  tags        String[]
+  customFields Json?        // Store dynamic custom fields
   
   // Lead qualification
   qualificationCategory String?
@@ -85,7 +94,7 @@ model Contact {
   assignedTo String?
 
   // Relationships
-  user       User         @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user       User         @relation(fields: [createdBy], references: [id])
   deals      Deal[]
   activities Activity[]
   callLogs   CallLog[]
@@ -96,13 +105,25 @@ model Contact {
   @@map("contacts")
 }
 
+enum ContactStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL_SENT
+  NEGOTIATING
+  CLOSED_WON
+  CLOSED_LOST
+  NURTURING
+  DEAD
+}
+
 model Deal {
   id          String     @id @default(uuid())
   title       String
   description String?
-  value       Float?
+  value       Decimal?   @db.Decimal(10, 2)
   currency    String     @default("USD")
-  stage       String     @default("LEAD") // LEAD, QUALIFIED, PROPOSAL, etc.
+  stage       DealStage  @default(LEAD)
   probability Int?       @default(0)
   expectedCloseDate DateTime?
   actualCloseDate   DateTime?
@@ -115,8 +136,8 @@ model Deal {
   assignedTo String?
 
   // Relationships
-  user       User         @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  contact    Contact?     @relation(fields: [contactId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user       User         @relation(fields: [createdBy], references: [id])
+  contact    Contact?     @relation(fields: [contactId], references: [id])
   contactId  String?
   activities Activity[]
   notes      Note[]
@@ -125,22 +146,31 @@ model Deal {
   @@map("deals")
 }
 
+enum DealStage {
+  LEAD
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  CLOSED_WON
+  CLOSED_LOST
+}
+
 // AI Campaign System
 model Campaign {
   id          String         @id @default(uuid())
   name        String
   description String?
-  type        String         @default("OUTBOUND_CALLING") // OUTBOUND_CALLING, EMAIL_SEQUENCE, etc.
-  status      String         @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED, CANCELLED
+  type        CampaignType   @default(OUTBOUND_CALLING)
+  status      CampaignStatus @default(DRAFT)
   
-  // AI Configuration stored as JSON string
-  aiConfig    String @default("{}")
+  // AI Configuration
+  aiConfig    Json // Voice settings, personality, scripts, etc.
   
-  // Campaign Rules stored as JSON string
-  rules       String @default("{}")
+  // Campaign Rules
+  rules       Json // Qualification criteria, actions, limits
   
-  // Statistics stored as JSON string
-  stats       String @default("{}")
+  // Statistics
+  stats       Json // Performance metrics
   
   // Scheduling
   startDate   DateTime?
@@ -152,7 +182,7 @@ model Campaign {
   createdBy String
 
   // Relationships
-  user             User                @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user             User                @relation(fields: [createdBy], references: [id])
   campaignContacts CampaignContact[]
   callLogs         CallLog[]
   activities       Activity[]
@@ -160,19 +190,34 @@ model Campaign {
   @@map("campaigns")
 }
 
+enum CampaignType {
+  OUTBOUND_CALLING
+  EMAIL_SEQUENCE
+  SMS_SEQUENCE
+  MULTI_CHANNEL
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
 model CampaignContact {
-  id         String    @id @default(uuid())
+  id         String               @id @default(uuid())
   campaignId String
   contactId  String
-  status     String    @default("PENDING") // PENDING, IN_PROGRESS, CONTACTED, etc.
-  stage      String    @default("new")
-  priority   Int       @default(0)
-  attempts   Int       @default(0)
+  status     CampaignContactStatus @default(PENDING)
+  stage      String               @default("new")
+  priority   Int                  @default(0)
+  attempts   Int                  @default(0)
   lastAttempt DateTime?
   nextAttempt DateTime?
   
-  // Journey tracking stored as JSON string
-  journey    String?
+  // Journey tracking
+  journey    Json? // Track prospect journey through campaign
   
   // Metadata
   addedAt   DateTime @default(now())
@@ -187,27 +232,38 @@ model CampaignContact {
   @@map("campaign_contacts")
 }
 
+enum CampaignContactStatus {
+  PENDING
+  IN_PROGRESS
+  CONTACTED
+  INTERESTED
+  NOT_INTERESTED
+  QUALIFIED
+  DEAD
+  COMPLETED
+}
+
 // AI Virtual Agents
 model VirtualAgent {
-  id          String   @id @default(uuid())
+  id          String            @id @default(uuid())
   name        String
-  type        String   @default("AI_CALLER") // AI_CALLER, AI_QUALIFIER, etc.
-  status      String   @default("IDLE") // ACTIVE, IDLE, CALLING, etc.
+  type        VirtualAgentType  @default(AI_CALLER)
+  status      VirtualAgentStatus @default(IDLE)
   
-  // Configuration stored as JSON string
-  config      String @default("{}")
+  // Configuration
+  config      Json // AI personality, voice, capabilities
   
-  // Performance stored as JSON string
-  stats       String @default("{}")
+  // Performance
+  stats       Json // Call statistics, success rates, etc.
   
-  // Current Activity stored as JSON string
-  currentActivity String?
+  // Current Activity
+  currentActivity Json?
   
-  // Work Schedule stored as JSON string
-  workingHours String @default("{}")
+  // Work Schedule
+  workingHours Json // Start time, end time, timezone, days
   
-  // Assigned Campaigns stored as comma-separated IDs
-  assignedCampaigns String?
+  // Assigned Campaigns
+  assignedCampaigns String[] // Array of campaign IDs
   
   // Metadata
   createdAt DateTime @default(now())
@@ -215,18 +271,34 @@ model VirtualAgent {
   createdBy String
 
   // Relationships
-  user     User      @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user     User      @relation(fields: [createdBy], references: [id])
   callLogs CallLog[]
 
   @@map("virtual_agents")
+}
+
+enum VirtualAgentType {
+  AI_CALLER
+  AI_QUALIFIER
+  AI_RESEARCHER
+  AI_EMAILER
+}
+
+enum VirtualAgentStatus {
+  ACTIVE
+  IDLE
+  CALLING
+  RESEARCHING
+  PAUSED
+  OFFLINE
 }
 
 // Communication & Activities
 model CallLog {
   id          String     @id @default(uuid())
   telnyxCallId String?   @unique
-  direction   String     @default("OUTBOUND") // INBOUND, OUTBOUND
-  status      String     @default("INITIATED") // INITIATED, RINGING, ANSWERED, etc.
+  direction   CallDirection @default(OUTBOUND)
+  status      CallStatus @default(INITIATED)
   
   // Participants
   fromNumber  String
@@ -240,10 +312,10 @@ model CallLog {
   duration    Int?      // seconds
   
   // AI Processing
-  transcript  String?
-  summary     String?
+  transcript  String?   // Full conversation transcript
+  summary     String?   // AI-generated summary
   sentiment   String?   // positive, negative, neutral
-  insights    String?   // JSON string
+  insights    Json?     // AI analysis results
   
   // Actions
   outcome     String?   // interested, not_interested, callback, etc.
@@ -262,19 +334,34 @@ model CallLog {
   createdBy String
 
   // Relationships
-  user            User             @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  contact         Contact?         @relation(fields: [contactId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  campaign        Campaign?        @relation(fields: [campaignId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  virtualAgent    VirtualAgent?    @relation(fields: [agentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  campaignContact CampaignContact? @relation(fields: [campaignContactId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user            User             @relation(fields: [createdBy], references: [id])
+  contact         Contact?         @relation(fields: [contactId], references: [id])
+  campaign        Campaign?        @relation(fields: [campaignId], references: [id])
+  virtualAgent    VirtualAgent?    @relation(fields: [agentId], references: [id])
+  campaignContact CampaignContact? @relation(fields: [campaignContactId], references: [id])
   campaignContactId String?
 
   @@map("call_logs")
 }
 
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CallStatus {
+  INITIATED
+  RINGING
+  ANSWERED
+  NO_ANSWER
+  BUSY
+  FAILED
+  COMPLETED
+}
+
 model Activity {
-  id          String   @id @default(uuid())
-  type        String   // CALL, EMAIL, MEETING, NOTE, etc.
+  id          String       @id @default(uuid())
+  type        ActivityType
   title       String
   description String?
   
@@ -289,12 +376,24 @@ model Activity {
   createdBy String
 
   // Relationships
-  user     User      @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  contact  Contact?  @relation(fields: [contactId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  deal     Deal?     @relation(fields: [dealId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user     User      @relation(fields: [createdBy], references: [id])
+  contact  Contact?  @relation(fields: [contactId], references: [id])
+  deal     Deal?     @relation(fields: [dealId], references: [id])
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
 
   @@map("activities")
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  NOTE
+  TASK
+  SMS
+  WEBSITE_VISIT
+  DOCUMENT_VIEW
+  CAMPAIGN_ACTION
 }
 
 // Email & Templates
@@ -302,7 +401,7 @@ model EmailTemplate {
   id          String @id @default(uuid())
   name        String
   subject     String
-  body        String @db.Text // HTML content
+  body        String // HTML content
   category    String?
   isShared    Boolean @default(false)
   
@@ -312,7 +411,7 @@ model EmailTemplate {
   createdBy String
 
   // Relationships
-  user User @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user User @relation(fields: [createdBy], references: [id])
 
   @@map("email_templates")
 }
@@ -320,7 +419,7 @@ model EmailTemplate {
 // Notes & Tasks
 model Note {
   id        String @id @default(uuid())
-  content   String @db.Text
+  content   String
   isPrivate Boolean @default(false)
   
   // Context
@@ -333,9 +432,9 @@ model Note {
   createdBy String
 
   // Relationships
-  user    User     @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  contact Contact? @relation(fields: [contactId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user    User     @relation(fields: [createdBy], references: [id])
+  contact Contact? @relation(fields: [contactId], references: [id])
+  deal    Deal?    @relation(fields: [dealId], references: [id])
 
   @@map("notes")
 }
@@ -344,8 +443,8 @@ model Task {
   id          String     @id @default(uuid())
   title       String
   description String?
-  status      String     @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
-  priority    String     @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status      TaskStatus @default(PENDING)
+  priority    TaskPriority @default(MEDIUM)
   dueDate     DateTime?
   completedAt DateTime?
   
@@ -360,11 +459,25 @@ model Task {
   assignedTo String?
 
   // Relationships
-  user    User     @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  contact Contact? @relation(fields: [contactId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user    User     @relation(fields: [createdBy], references: [id])
+  contact Contact? @relation(fields: [contactId], references: [id])
+  deal    Deal?    @relation(fields: [dealId], references: [id])
 
   @@map("tasks")
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
 
 // Audit & Compliance
@@ -373,8 +486,8 @@ model AuditLog {
   action    String   // CREATE, UPDATE, DELETE, LOGIN, etc.
   resource  String   // contacts, deals, campaigns, etc.
   resourceId String?
-  oldData   String?  // JSON string
-  newData   String?  // JSON string
+  oldData   Json?
+  newData   Json?
   ipAddress String?
   userAgent String?
   
@@ -383,7 +496,7 @@ model AuditLog {
   userId    String
 
   // Relationships
-  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user User @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
 }
@@ -392,7 +505,7 @@ model AuditLog {
 model SystemConfig {
   id    String @id @default(uuid())
   key   String @unique
-  value String @db.Text // JSON string
+  value Json
   
   // Metadata
   createdAt DateTime @default(now())
@@ -405,13 +518,13 @@ model SystemConfig {
 model Job {
   id        String    @id @default(uuid())
   type      String    // ai_call, email_send, data_enrichment, etc.
-  data      String @db.Text    // JSON string
-  status    String @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED
+  data      Json      // Job payload
+  status    JobStatus @default(PENDING)
   priority  Int       @default(0)
   attempts  Int       @default(0)
   maxAttempts Int     @default(3)
   error     String?
-  result    String?   // JSON string
+  result    Json?
   
   // Scheduling
   scheduledAt DateTime?
@@ -423,4 +536,12 @@ model Job {
   updatedAt DateTime @updatedAt
 
   @@map("jobs")
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
 }

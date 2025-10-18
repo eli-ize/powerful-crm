@@ -16,7 +16,7 @@ CREATE TABLE [dbo].[users] (
     [createdAt] DATETIME2 NOT NULL CONSTRAINT [users_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
     [updatedAt] DATETIME2 NOT NULL,
     [lastLogin] DATETIME2,
-    [permissions] NVARCHAR(1000) NOT NULL,
+    [permissions] NVARCHAR(1000) NOT NULL CONSTRAINT [users_permissions_df] DEFAULT '{}',
     CONSTRAINT [users_pkey] PRIMARY KEY CLUSTERED ([id]),
     CONSTRAINT [users_email_key] UNIQUE NONCLUSTERED ([email])
 );
@@ -47,7 +47,7 @@ CREATE TABLE [dbo].[contacts] (
     [source] NVARCHAR(1000),
     [status] NVARCHAR(1000) NOT NULL CONSTRAINT [contacts_status_df] DEFAULT 'NEW',
     [score] INT CONSTRAINT [contacts_score_df] DEFAULT 0,
-    [tags] NVARCHAR(1000) NOT NULL,
+    [tags] NVARCHAR(1000),
     [customFields] NVARCHAR(1000),
     [qualificationCategory] NVARCHAR(1000),
     [qualificationReason] NVARCHAR(1000),
@@ -64,7 +64,7 @@ CREATE TABLE [dbo].[deals] (
     [id] NVARCHAR(1000) NOT NULL,
     [title] NVARCHAR(1000) NOT NULL,
     [description] NVARCHAR(1000),
-    [value] DECIMAL(10,2),
+    [value] FLOAT(53),
     [currency] NVARCHAR(1000) NOT NULL CONSTRAINT [deals_currency_df] DEFAULT 'USD',
     [stage] NVARCHAR(1000) NOT NULL CONSTRAINT [deals_stage_df] DEFAULT 'LEAD',
     [probability] INT CONSTRAINT [deals_probability_df] DEFAULT 0,
@@ -86,9 +86,9 @@ CREATE TABLE [dbo].[campaigns] (
     [description] NVARCHAR(1000),
     [type] NVARCHAR(1000) NOT NULL CONSTRAINT [campaigns_type_df] DEFAULT 'OUTBOUND_CALLING',
     [status] NVARCHAR(1000) NOT NULL CONSTRAINT [campaigns_status_df] DEFAULT 'DRAFT',
-    [aiConfig] NVARCHAR(1000) NOT NULL,
-    [rules] NVARCHAR(1000) NOT NULL,
-    [stats] NVARCHAR(1000) NOT NULL,
+    [aiConfig] NVARCHAR(1000) NOT NULL CONSTRAINT [campaigns_aiConfig_df] DEFAULT '{}',
+    [rules] NVARCHAR(1000) NOT NULL CONSTRAINT [campaigns_rules_df] DEFAULT '{}',
+    [stats] NVARCHAR(1000) NOT NULL CONSTRAINT [campaigns_stats_df] DEFAULT '{}',
     [startDate] DATETIME2,
     [endDate] DATETIME2,
     [createdAt] DATETIME2 NOT NULL CONSTRAINT [campaigns_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
@@ -121,11 +121,11 @@ CREATE TABLE [dbo].[virtual_agents] (
     [name] NVARCHAR(1000) NOT NULL,
     [type] NVARCHAR(1000) NOT NULL CONSTRAINT [virtual_agents_type_df] DEFAULT 'AI_CALLER',
     [status] NVARCHAR(1000) NOT NULL CONSTRAINT [virtual_agents_status_df] DEFAULT 'IDLE',
-    [config] NVARCHAR(1000) NOT NULL,
-    [stats] NVARCHAR(1000) NOT NULL,
+    [config] NVARCHAR(1000) NOT NULL CONSTRAINT [virtual_agents_config_df] DEFAULT '{}',
+    [stats] NVARCHAR(1000) NOT NULL CONSTRAINT [virtual_agents_stats_df] DEFAULT '{}',
     [currentActivity] NVARCHAR(1000),
-    [workingHours] NVARCHAR(1000) NOT NULL,
-    [assignedCampaigns] NVARCHAR(1000) NOT NULL,
+    [workingHours] NVARCHAR(1000) NOT NULL CONSTRAINT [virtual_agents_workingHours_df] DEFAULT '{}',
+    [assignedCampaigns] NVARCHAR(1000),
     [createdAt] DATETIME2 NOT NULL CONSTRAINT [virtual_agents_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
     [updatedAt] DATETIME2 NOT NULL,
     [createdBy] NVARCHAR(1000) NOT NULL,
@@ -182,7 +182,7 @@ CREATE TABLE [dbo].[email_templates] (
     [id] NVARCHAR(1000) NOT NULL,
     [name] NVARCHAR(1000) NOT NULL,
     [subject] NVARCHAR(1000) NOT NULL,
-    [body] NVARCHAR(1000) NOT NULL,
+    [body] TEXT NOT NULL,
     [category] NVARCHAR(1000),
     [isShared] BIT NOT NULL CONSTRAINT [email_templates_isShared_df] DEFAULT 0,
     [createdAt] DATETIME2 NOT NULL CONSTRAINT [email_templates_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
@@ -194,7 +194,7 @@ CREATE TABLE [dbo].[email_templates] (
 -- CreateTable
 CREATE TABLE [dbo].[notes] (
     [id] NVARCHAR(1000) NOT NULL,
-    [content] NVARCHAR(1000) NOT NULL,
+    [content] TEXT NOT NULL,
     [isPrivate] BIT NOT NULL CONSTRAINT [notes_isPrivate_df] DEFAULT 0,
     [contactId] NVARCHAR(1000),
     [dealId] NVARCHAR(1000),
@@ -241,7 +241,7 @@ CREATE TABLE [dbo].[audit_logs] (
 CREATE TABLE [dbo].[system_config] (
     [id] NVARCHAR(1000) NOT NULL,
     [key] NVARCHAR(1000) NOT NULL,
-    [value] NVARCHAR(1000) NOT NULL,
+    [value] TEXT NOT NULL,
     [createdAt] DATETIME2 NOT NULL CONSTRAINT [system_config_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
     [updatedAt] DATETIME2 NOT NULL,
     CONSTRAINT [system_config_pkey] PRIMARY KEY CLUSTERED ([id]),
@@ -252,7 +252,7 @@ CREATE TABLE [dbo].[system_config] (
 CREATE TABLE [dbo].[jobs] (
     [id] NVARCHAR(1000) NOT NULL,
     [type] NVARCHAR(1000) NOT NULL,
-    [data] NVARCHAR(1000) NOT NULL,
+    [data] TEXT NOT NULL,
     [status] NVARCHAR(1000) NOT NULL CONSTRAINT [jobs_status_df] DEFAULT 'PENDING',
     [priority] INT NOT NULL CONSTRAINT [jobs_priority_df] DEFAULT 0,
     [attempts] INT NOT NULL CONSTRAINT [jobs_attempts_df] DEFAULT 0,
@@ -271,7 +271,7 @@ CREATE TABLE [dbo].[jobs] (
 ALTER TABLE [dbo].[refresh_tokens] ADD CONSTRAINT [refresh_tokens_userId_fkey] FOREIGN KEY ([userId]) REFERENCES [dbo].[users]([id]) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE [dbo].[contacts] ADD CONSTRAINT [contacts_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE CASCADE;
+ALTER TABLE [dbo].[contacts] ADD CONSTRAINT [contacts_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE [dbo].[deals] ADD CONSTRAINT [deals_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
@@ -280,16 +280,16 @@ ALTER TABLE [dbo].[deals] ADD CONSTRAINT [deals_createdBy_fkey] FOREIGN KEY ([cr
 ALTER TABLE [dbo].[deals] ADD CONSTRAINT [deals_contactId_fkey] FOREIGN KEY ([contactId]) REFERENCES [dbo].[contacts]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE [dbo].[campaigns] ADD CONSTRAINT [campaigns_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE CASCADE;
+ALTER TABLE [dbo].[campaigns] ADD CONSTRAINT [campaigns_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE [dbo].[campaign_contacts] ADD CONSTRAINT [campaign_contacts_campaignId_fkey] FOREIGN KEY ([campaignId]) REFERENCES [dbo].[campaigns]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE [dbo].[campaign_contacts] ADD CONSTRAINT [campaign_contacts_campaignId_fkey] FOREIGN KEY ([campaignId]) REFERENCES [dbo].[campaigns]([id]) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE [dbo].[campaign_contacts] ADD CONSTRAINT [campaign_contacts_contactId_fkey] FOREIGN KEY ([contactId]) REFERENCES [dbo].[contacts]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE [dbo].[campaign_contacts] ADD CONSTRAINT [campaign_contacts_contactId_fkey] FOREIGN KEY ([contactId]) REFERENCES [dbo].[contacts]([id]) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE [dbo].[virtual_agents] ADD CONSTRAINT [virtual_agents_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE CASCADE;
+ALTER TABLE [dbo].[virtual_agents] ADD CONSTRAINT [virtual_agents_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE [dbo].[call_logs] ADD CONSTRAINT [call_logs_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
@@ -319,7 +319,7 @@ ALTER TABLE [dbo].[activities] ADD CONSTRAINT [activities_dealId_fkey] FOREIGN K
 ALTER TABLE [dbo].[activities] ADD CONSTRAINT [activities_campaignId_fkey] FOREIGN KEY ([campaignId]) REFERENCES [dbo].[campaigns]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE [dbo].[email_templates] ADD CONSTRAINT [email_templates_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE CASCADE;
+ALTER TABLE [dbo].[email_templates] ADD CONSTRAINT [email_templates_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE [dbo].[notes] ADD CONSTRAINT [notes_createdBy_fkey] FOREIGN KEY ([createdBy]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
@@ -340,7 +340,7 @@ ALTER TABLE [dbo].[tasks] ADD CONSTRAINT [tasks_contactId_fkey] FOREIGN KEY ([co
 ALTER TABLE [dbo].[tasks] ADD CONSTRAINT [tasks_dealId_fkey] FOREIGN KEY ([dealId]) REFERENCES [dbo].[deals]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE [dbo].[audit_logs] ADD CONSTRAINT [audit_logs_userId_fkey] FOREIGN KEY ([userId]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE CASCADE;
+ALTER TABLE [dbo].[audit_logs] ADD CONSTRAINT [audit_logs_userId_fkey] FOREIGN KEY ([userId]) REFERENCES [dbo].[users]([id]) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 COMMIT TRAN;
 
