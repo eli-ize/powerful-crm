@@ -49,8 +49,8 @@ RUN npm ci --only=production
 # Copy built backend from build stage
 COPY --from=backend-build /app/backend/dist ./dist
 
-# Copy built frontend from build stage
-COPY --from=frontend-build /app/frontend/dist ./public
+# Copy built frontend from build stage (Vite builds to 'build' directory)
+COPY --from=frontend-build /app/frontend/build ./public
 
 # Create a simple server to serve both frontend and backend
 RUN npm install express
