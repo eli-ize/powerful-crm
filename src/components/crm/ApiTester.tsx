@@ -6,18 +6,7 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { Badge } from '../ui/badge';
 import { Loader2, Search, Phone, Globe, MapPin, Star } from 'lucide-react';
 import { api } from '../../utils/api';
-
-interface Place {
-  place_id: string;
-  name: string;
-  formatted_address: string;
-  formatted_phone_number?: string;
-  website?: string;
-  rating?: number;
-  user_ratings_total?: number;
-  business_status?: string;
-  types: string[];
-}
+import type { Place } from '../../types/api.types';
 
 export function ApiTester() {
   const [searchQuery, setSearchQuery] = useState('restaurants in New York');
@@ -37,7 +26,9 @@ export function ApiTester() {
       await api.healthCheck();
       setBackendStatus('online');
     } catch (error) {
-      // Backend connection failed - show offline status\n      setBackendStatus('offline');
+      // Backend connection failed - show offline status
+      console.error('Backend health check failed:', error);
+      setBackendStatus('offline');
     }
   };
 
@@ -140,8 +131,9 @@ export function ApiTester() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Search Query</label>
+              <label htmlFor="searchQuery" className="text-sm font-medium">Search Query</label>
               <Input
+                id="searchQuery"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="e.g., restaurants in Miami"
@@ -149,8 +141,9 @@ export function ApiTester() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Location (Optional)</label>
+              <label htmlFor="location" className="text-sm font-medium">Location (Optional)</label>
               <Input
+                id="location"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="e.g., New York, NY"
@@ -249,9 +242,9 @@ export function ApiTester() {
                         </div>
                         
                         <div className="flex flex-wrap gap-1">
-                          {place.types.slice(0, 3).map((type) => (
+                          {place.types?.slice(0, 3).map((type) => (
                             <Badge key={type} variant="secondary" className="text-xs">
-                              {type.replace(/_/g, ' ')}
+                              {type.replaceAll('_', ' ')}
                             </Badge>
                           ))}
                         </div>

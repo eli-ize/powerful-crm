@@ -804,7 +804,7 @@ export function TelnyxManager() {
                       </div>
                       <Switch
                         checked={number.aiEnabled}
-                        onCheckedChange={(checked) => updateNumber(number.id, { aiEnabled: checked })}
+                        onCheckedChange={(checked: boolean) => updateNumber(number.id, { aiEnabled: checked })}
                       />
                     </div>
                   </CardHeader>
@@ -1030,14 +1030,14 @@ export function TelnyxManager() {
                 <Label>Active</Label>
                 <Switch
                   checked={editingNumber.isActive}
-                  onCheckedChange={(checked) => setEditingNumber({ ...editingNumber, isActive: checked })}
+                  onCheckedChange={(checked: boolean) => setEditingNumber({ ...editingNumber, isActive: checked })}
                 />
               </div>
               <div className="flex items-center justify-between">
                 <Label>AI Enabled</Label>
                 <Switch
                   checked={editingNumber.aiEnabled}
-                  onCheckedChange={(checked) => setEditingNumber({ ...editingNumber, aiEnabled: checked })}
+                  onCheckedChange={(checked: boolean) => setEditingNumber({ ...editingNumber, aiEnabled: checked })}
                 />
               </div>
               <div className="flex gap-2 justify-end">
