@@ -49,7 +49,6 @@ azure-deployment-info.txt
 *.sqlite3
 prisma/dev.db
 
-# Package manager
-package-lock.json
+# Package manager (keep package-lock.json for Docker builds)
 yarn.lock
 pnpm-lock.yaml
