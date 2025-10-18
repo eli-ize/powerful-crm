@@ -1,34 +1,55 @@
 
-  # 🤖 AI-Powered CRM & Call Center Platform
+  # Powerful CRM
 
-**Deploy for FREE** on Azure's generous free tier! An intelligent CRM that autonomously finds leads, qualifies them, and conducts AI-powered cold calls.
+AI-powered CRM with Telnyx calling integration.
 
-🌟 **Features:** Lead finding, AI calling, campaign automation, virtual agents, real-time analytics
-🏗️ **Architecture:** React frontend + Node.js backend + Azure AI services
-💰 **Cost:** $0-15/month (Azure free tier)
+## Live URL
+https://powerful-crm.gentlepond-89090d4a.eastus.azurecontainerapps.io
 
-## 🚀 Quick Start
+## Quick Start
 
-### 1. Run Locally (Demo Mode)
+### Local Development
 ```bash
+# Frontend
+npm install
+npm run dev
+
+# Backend
+cd backend
 npm install
 npm run dev
 ```
-Open http://localhost:3000
 
-Demo accounts: `admin@crm.com / demo123`
+### Deploy
+Push to `deploy-clean` branch - deploys automatically via GitHub Actions.
 
-### 2. Deploy to Azure FREE Tier
-```bash
-# One-click deployment to Azure (FREE)
-git clone https://github.com/YOUR_USERNAME/powerful-crm.git
-cd powerful-crm
-./deploy-azure.sh
-```
+## Configuration
 
-**See [DEPLOYMENT_QUICKSTART.md](./DEPLOYMENT_QUICKSTART.md) for complete setup.**
+### Required GitHub Secrets
+- `AZURE_CREDENTIALS` - Azure service principal
+- `JWT_SECRET` - Min 32 chars
+- `JWT_REFRESH_SECRET` - Min 32 chars  
+- `BACKEND_URL` - Production URL
+- `TELNYX_API_KEY` - From Telnyx portal
+- `TELNYX_CONNECTION_ID` - Outbound voice profile ID
+- `DATABASE_URL` - SQLite: `file:./production.db`
 
-## 📖 Documentation
+### Telnyx Setup
+1. Get Outbound Voice Profile at https://portal.telnyx.com/#/app/outbound_voice_profiles
+2. Set webhook: `https://powerful-crm.gentlepond-89090d4a.eastus.azurecontainerapps.io/api/calls/webhook`
+3. Add profile ID to `TELNYX_CONNECTION_ID` secret
+
+## Tech Stack
+- Frontend: React + Vite + TypeScript
+- Backend: Node.js + Express + Prisma
+- Database: SQLite (production), PostgreSQL (optional)
+- Deployment: Azure Container Apps
+- Registry: GitHub Container Registry
+
+---
+
+## 📖 Documentation (OLD - IGNORE)
+
 
 - 🏗️ **[ARCHITECTURE.md](./src/ARCHITECTURE.md)** - Complete system design
 - 🚀 **[DEPLOYMENT_QUICKSTART.md](./DEPLOYMENT_QUICKSTART.md)** - 15-minute Azure setup  
