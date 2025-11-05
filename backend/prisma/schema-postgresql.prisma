@@ -1,0 +1,402 @@
+// Local PostgreSQL development schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management & Authentication
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("SALES_REP") // SUPER_ADMIN, ADMIN, MANAGER, SALES_REP, VIEWER
+  avatar    String?
+  company   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastLogin DateTime?
+
+  // Permissions stored as JSON
+  permissions Json @default("{}")
+
+  // Relationships
+  contacts        Contact[]
+  deals           Deal[]
+  activities      Activity[]
+  campaigns       Campaign[]
+  virtualAgents   VirtualAgent[]
+  callLogs        CallLog[]
+  emailTemplates  EmailTemplate[]
+  notes           Note[]
+  tasks           Task[]
+  refreshTokens   RefreshToken[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// CRM Core Models
+model Contact {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  company   String?
+  jobTitle  String?
+  industry  String?
+  location  String?
+  website   String?
+  linkedin  String?
+  source    String? // manual, import, google_places, linkedin
+  
+  // Lead scoring
+  score     Int      @default(0)
+  status    String   @default("new") // new, contacted, qualified, unqualified, customer
+  
+  // Additional data stored as JSON
+  metadata  Json     @default("{}")
+  
+  tags      String[] // Array of tags
+  
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  deals             Deal[]
+  activities        Activity[]
+  callLogs          CallLog[]
+  notes             Note[]
+  tasks             Task[]
+  campaignContacts  CampaignContact[]
+
+  @@map("contacts")
+}
+
+model Deal {
+  id          String   @id @default(uuid())
+  title       String
+  value       Float    @default(0)
+  currency    String   @default("USD")
+  stage       String   @default("lead") // lead, qualified, proposal, negotiation, won, lost
+  probability Int      @default(0)
+  
+  expectedCloseDate DateTime?
+  actualCloseDate   DateTime?
+  
+  winReason       String?
+  lossReason      String?
+  
+  description     String?  @db.Text
+  
+  metadata        Json     @default("{}")
+  
+  contactId       String
+  contact         Contact  @relation(fields: [contactId], references: [id])
+  
+  ownerId         String
+  owner           User     @relation(fields: [ownerId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  activities Activity[]
+  notes      Note[]
+  tasks      Task[]
+
+  @@map("deals")
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  name        String
+  type        String   // email, call, sms, multi_channel
+  status      String   @default("draft") // draft, scheduled, active, paused, completed
+  
+  objective   String?  @db.Text
+  
+  startDate   DateTime?
+  endDate     DateTime?
+  
+  // Campaign settings stored as JSON
+  settings    Json     @default("{}")
+  
+  // Statistics
+  totalContacts   Int @default(0)
+  contacted       Int @default(0)
+  responded       Int @default(0)
+  converted       Int @default(0)
+  
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  campaignContacts CampaignContact[]
+  virtualAgents    VirtualAgent[]
+
+  @@map("campaigns")
+}
+
+model CampaignContact {
+  id         String   @id @default(uuid())
+  
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  status     String   @default("pending") // pending, contacted, responded, converted, failed
+  attempts   Int      @default(0)
+  lastAttempt DateTime?
+  
+  metadata   Json     @default("{}")
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([campaignId, contactId])
+  @@map("campaign_contacts")
+}
+
+model VirtualAgent {
+  id          String   @id @default(uuid())
+  name        String
+  personality String   @db.Text // AI personality prompt
+  objective   String   @db.Text // Agent's goal
+  
+  isActive    Boolean  @default(true)
+  
+  // Agent configuration stored as JSON
+  config      Json     @default("{}")
+  
+  // Statistics
+  totalCalls     Int @default(0)
+  successfulCalls Int @default(0)
+  avgCallDuration Float @default(0)
+  conversionRate  Float @default(0)
+  
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id])
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relationships
+  callLogs CallLog[]
+
+  @@map("virtual_agents")
+}
+
+model CallLog {
+  id          String   @id @default(uuid())
+  
+  direction   String   // inbound, outbound
+  status      String   // completed, failed, no_answer, busy, voicemail
+  duration    Int      @default(0) // seconds
+  
+  phoneNumber String?
+  
+  // Call recording and transcription
+  recordingUrl    String?
+  transcription   String?  @db.Text
+  
+  // AI analysis
+  sentiment       String?  // positive, neutral, negative
+  outcome         String?  // interested, not_interested, callback, meeting_scheduled
+  nextAction      String?  @db.Text
+  
+  metadata        Json     @default("{}")
+  
+  contactId       String?
+  contact         Contact?  @relation(fields: [contactId], references: [id])
+  
+  virtualAgentId  String?
+  virtualAgent    VirtualAgent? @relation(fields: [virtualAgentId], references: [id])
+  
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("call_logs")
+}
+
+model Activity {
+  id          String   @id @default(uuid())
+  type        String   // call, email, meeting, note, task
+  subject     String
+  description String?  @db.Text
+  
+  status      String   @default("completed") // completed, scheduled, cancelled
+  
+  scheduledAt DateTime?
+  completedAt DateTime?
+  
+  metadata    Json     @default("{}")
+  
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id])
+  
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id])
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("activities")
+}
+
+model EmailTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  subject     String
+  body        String   @db.Text
+  
+  // Variables: {{firstName}}, {{company}}, etc.
+  variables   String[]
+  
+  category    String?  // cold_outreach, follow_up, meeting_request, etc.
+  
+  isActive    Boolean  @default(true)
+  
+  metadata    Json     @default("{}")
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("email_templates")
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id])
+  
+  dealId    String?
+  deal      Deal?    @relation(fields: [dealId], references: [id])
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notes")
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  
+  status      String   @default("pending") // pending, in_progress, completed, cancelled
+  priority    String   @default("medium") // low, medium, high, urgent
+  
+  dueDate     DateTime?
+  completedAt DateTime?
+  
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id])
+  
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id])
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tasks")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String   // create, update, delete, login, logout
+  entityType  String   // user, contact, deal, campaign, etc.
+  entityId    String?
+  
+  changes     Json?    // Old and new values
+  
+  ipAddress   String?
+  userAgent   String?
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String   @db.Text
+  
+  description String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+model Job {
+  id          String   @id @default(uuid())
+  type        String   // email_campaign, call_campaign, data_import, etc.
+  status      String   @default("pending") // pending, running, completed, failed
+  
+  progress    Int      @default(0) // 0-100
+  
+  data        Json     @default("{}")
+  result      Json?
+  error       String?  @db.Text
+  
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("jobs")
+}

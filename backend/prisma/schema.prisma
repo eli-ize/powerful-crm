@@ -1,12 +1,20 @@
-// Azure SQL Server compatible schema
+// Database Configuration
+// Currently using Azure SQL Server (Europe) - 150-180ms latency
+// Recommended: Migrate to Azure PostgreSQL (Johannesburg) for 5-15ms latency
+// See AZURE_POSTGRESQL_SA.md for migration guide
+
 generator client {
   provider = "prisma-client-js"
 }
 
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "./Prisma_Database_ERD.png"
+}
+
 datasource db {
-  provider          = "sqlserver"
-  url               = env("DATABASE_URL")
-  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 // User Management & Authentication
@@ -39,6 +47,8 @@ model User {
   tasks           Task[]
   refreshTokens   RefreshToken[]
   auditLogs       AuditLog[]
+  userConfig      UserConfig?
+  autopilotConfigs AutopilotConfig[]
 
   @@map("users")
 }
@@ -302,7 +312,7 @@ model EmailTemplate {
   id          String @id @default(uuid())
   name        String
   subject     String
-  body        String @db.Text // HTML content
+  body        String // HTML content
   category    String?
   isShared    Boolean @default(false)
   
@@ -320,7 +330,7 @@ model EmailTemplate {
 // Notes & Tasks
 model Note {
   id        String @id @default(uuid())
-  content   String @db.Text
+  content   String
   isPrivate Boolean @default(false)
   
   // Context
@@ -390,9 +400,11 @@ model AuditLog {
 
 // System Configuration
 model SystemConfig {
-  id    String @id @default(uuid())
-  key   String @unique
-  value String @db.Text // JSON string
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String // Encrypted value or JSON string
+  category  String?  // e.g., 'api_key', 'setting', 'feature_flag'
+  encrypted Boolean  @default(true)
   
   // Metadata
   createdAt DateTime @default(now())
@@ -401,11 +413,45 @@ model SystemConfig {
   @@map("system_config")
 }
 
+// User Configuration for API usage limits
+model UserConfig {
+  id                    String @id @default(uuid())
+  userId                String @unique
+  dailySpendingLimit    Float? @default(10.0)
+  monthlySpendingLimit  Float? @default(100.0)
+  perCallLimit          Float? @default(2.0)
+  maxCallDuration       Int?   @default(300) // seconds
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_config")
+}
+
+// API Usage tracking for cost monitoring
+model ApiUsage {
+  id        String   @id @default(uuid())
+  service   String   // openai, azure_speech, telnyx
+  operation String   // call, transcribe, synthesize, etc.
+  cost      Float
+  metadata  String?  // JSON string for additional details
+  userId    String?
+  
+  // Metadata
+  createdAt DateTime @default(now())
+
+  @@map("api_usage")
+}
+
 // Job Queue (for background processing)
 model Job {
   id        String    @id @default(uuid())
   type      String    // ai_call, email_send, data_enrichment, etc.
-  data      String @db.Text    // JSON string
+  data      String    // JSON string
   status    String @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED
   priority  Int       @default(0)
   attempts  Int       @default(0)
@@ -423,4 +469,92 @@ model Job {
   updatedAt DateTime @updatedAt
 
   @@map("jobs")
+}
+
+// AI Autopilot System
+model AutopilotConfig {
+  id          String  @id @default(uuid())
+  userId      String
+  name        String  @default("Default Autopilot")
+  industry    String  @default("web_design")
+  isActive    Boolean @default(false)
+  
+  // Configuration stored as JSON
+  config      String  @default("{}")
+  
+  // Performance metrics
+  totalLeadsFound    Int @default(0)
+  totalCallsMade     Int @default(0)
+  totalMeetingsBooked Int @default(0)
+  totalRevenue       Float @default(0)
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks AutopilotTask[]
+  workflows AutopilotWorkflow[]
+
+  @@map("autopilot_configs")
+}
+
+model AutopilotTask {
+  id          String    @id @default(uuid())
+  configId    String
+  type        String    // find_leads, analyze_website, make_calls, assign_designer, send_emails
+  status      String    @default("pending") // pending, in_progress, completed, failed
+  progress    Int       @default(0)
+  
+  // Task data
+  inputData   String?   // JSON string
+  resultData  String?   // JSON string
+  errorMessage String?
+  
+  // Assignment
+  assignedTo  String?   // For designer tasks
+  
+  // Timing
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relationships
+  config AutopilotConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@map("autopilot_tasks")
+}
+
+model AutopilotWorkflow {
+  id          String @id @default(uuid())
+  configId    String
+  name        String
+  description String?
+  
+  // Workflow definition
+  steps       String // JSON array of steps
+  currentStep Int    @default(0)
+  status      String @default("pending") // pending, running, completed, failed, paused
+  
+  // Results
+  totalSteps  Int    @default(0)
+  progress    Int    @default(0)
+  resultData  String? // JSON string
+  
+  // Timing
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relationships
+  config AutopilotConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@map("autopilot_workflows")
 }

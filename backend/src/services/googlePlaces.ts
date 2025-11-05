@@ -97,11 +97,11 @@ export class GooglePlacesService {
         allResults = [...data.results];
       }
 
-      // Get additional pages if available (up to 3 pages = ~60 results)
+      // Get additional pages if available (unlimited)
       let nextPageToken = data.next_page_token;
       let pageCount = 1;
       
-      while (nextPageToken && pageCount < 10) { // Get up to 10 pages (~200 results)
+      while (nextPageToken && pageCount < 60) { // Truly unlimited - get all available pages
         // Wait 2 seconds before next page request (Google requirement)
         await new Promise(resolve => setTimeout(resolve, 2000));
         

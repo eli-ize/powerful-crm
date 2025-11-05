@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice Chat - RAW PCM Audio</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .start-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        .stop-btn {
+            background: #f44336;
+            color: white;
+        }
+        .mute-btn {
+            background: #FF9800;
+            color: white;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 10px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+        }
+        #transcript {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            min-height: 200px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .user-message {
+            background: #E3F2FD;
+            text-align: right;
+        }
+        .ai-message {
+            background: #F3E5F5;
+        }
+        .volume-indicator {
+            height: 10px;
+            background: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .volume-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            width: 0%;
+            transition: width 0.1s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 AI Voice Chat - Azure Speech (RAW PCM)</h1>
+        
+        <div id="status">
+            <strong>Status:</strong> <span id="statusText">Ready</span>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="start-btn" onclick="startVoiceChat()">Start Voice Chat</button>
+            <button id="stopBtn" class="stop-btn" onclick="stopVoiceChat()" disabled>Stop</button>
+            <button id="muteBtn" class="mute-btn" onclick="toggleMute()" disabled>Mute/Unmute</button>
+        </div>
+
+        <div class="volume-indicator">
+            <div class="volume-bar" id="volumeBar"></div>
+        </div>
+
+        <div id="transcript">
+            <p><em>Transcript will appear here...</em></p>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        let socket = null;
+        let audioContext = null;
+        let scriptProcessor = null;
+        let analyser = null;
+        let mediaStream = null;
+        let audioBuffer = [];
+        let lastSendTime = 0;
+        let isMuted = false;
+        let isActive = false;
+        let currentAudio = null;
+        const SEND_INTERVAL = 3000; // Send every 3 seconds
+
+        function updateStatus(text) {
+            document.getElementById('statusText').textContent = text;
+        }
+
+        function addTranscript(text, isUser = true) {
+            const transcript = document.getElementById('transcript');
+            const message = document.createElement('div');
+            message.className = isUser ? 'message user-message' : 'message ai-message';
+            message.innerHTML = `<strong>${isUser ? 'You' : 'AI'}:</strong> ${text}`;
+            transcript.appendChild(message);
+            transcript.scrollTop = transcript.scrollHeight;
+        }
+
+        async function startVoiceChat() {
+            try {
+                updateStatus('Connecting...');
+                
+                // Connect to server
+                socket = io('http://localhost:8000', {
+                    transports: ['websocket'],
+                    reconnection: true
+                });
+
+                socket.on('connect', async () => {
+                    console.log('✅ Connected to server');
+                    updateStatus('Connected - Starting microphone...');
+
+                    // Start voice session
+                    const response = await fetch('http://localhost:8000/api/ai-chat/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            purpose: 'lead_qualification',
+                            contactName: 'Test User',
+                            contactPhone: '+1234567890'
+                        })
+                    });
+
+                    const data = await response.json();
+                    console.log('Session started:', data);
+
+                    // Request microphone access
+                    mediaStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        }
+                    });
+
+                    // Setup audio context
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioContext.createMediaStreamSource(mediaStream);
+
+                    // Setup analyser for volume visualization
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 256;
+                    source.connect(analyser);
+
+                    // Setup script processor for RAW PCM capture
+                    scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+                    source.connect(scriptProcessor);
+                    scriptProcessor.connect(audioContext.destination);
+
+                    scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
+                        if (!isActive || isMuted) return;
+
+                        const inputBuffer = audioProcessingEvent.inputBuffer;
+                        const inputData = inputBuffer.getChannelData(0); // Mono
+
+                        // Convert Float32Array to Int16Array (PCM 16-bit)
+                        const pcmData = new Int16Array(inputData.length);
+                        for (let i = 0; i < inputData.length; i++) {
+                            const s = Math.max(-1, Math.min(1, inputData[i]));
+                            pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                        }
+
+                        audioBuffer.push(pcmData);
+
+                        // Send accumulated audio every 3 seconds
+                        const now = Date.now();
+                        if (now - lastSendTime >= SEND_INTERVAL && audioBuffer.length > 0) {
+                            // Concatenate all buffers
+                            const totalLength = audioBuffer.reduce((sum, buf) => sum + buf.length, 0);
+                            const concatenated = new Int16Array(totalLength);
+                            let offset = 0;
+                            for (const buf of audioBuffer) {
+                                concatenated.set(buf, offset);
+                                offset += buf.length;
+                            }
+
+                            // Convert to base64
+                            const bytes = new Uint8Array(concatenated.buffer);
+                            let binary = '';
+                            for (let i = 0; i < bytes.length; i++) {
+                                binary += String.fromCharCode(bytes[i]);
+                            }
+                            const base64 = btoa(binary);
+
+                            const sampleRate = audioContext.sampleRate;
+                            console.log(`📤 Sending ${concatenated.length} PCM samples @ ${sampleRate}Hz (${bytes.length} bytes)`);
+
+                            socket.emit('audio_chunk_azure', {
+                                audio: base64,
+                                format: `audio/pcm;rate=${sampleRate};channels=1;bits=16`
+                            });
+
+                            audioBuffer = [];
+                            lastSendTime = now;
+                        }
+                    };
+
+                    isActive = true;
+                    lastSendTime = Date.now();
+                    updateStatus('🎤 Listening...');
+                    visualizeVolume();
+
+                    // Enable/disable buttons
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    document.getElementById('muteBtn').disabled = false;
+
+                    // Play AI greeting
+                    if (data.greeting) {
+                        addTranscript(data.greeting.text, false);
+                        if (data.greeting.audio) {
+                            playAudioBase64(data.greeting.audio);
+                        }
+                    }
+                });
+
+                socket.on('transcription', (data) => {
+                    console.log('📝 Transcription:', data);
+                    const text = typeof data === 'string' ? data : data.text;
+                    addTranscript(text, true);
+                });
+
+                socket.on('ai_response', (data) => {
+                    console.log('🤖 AI Response:', data);
+                    addTranscript(data.text, false);
+                    if (data.audio) {
+                        playAudioBase64(data.audio);
+                    }
+                });
+
+                socket.on('error', (error) => {
+                    console.error('❌ Error:', error);
+                    updateStatus('Error: ' + error.message);
+                });
+
+            } catch (error) {
+                console.error('❌ Failed to start:', error);
+                updateStatus('Error: ' + error.message);
+                alert('Failed to start voice chat: ' + error.message);
+            }
+        }
+
+        function stopVoiceChat() {
+            isActive = false;
+
+            if (scriptProcessor) {
+                scriptProcessor.disconnect();
+                scriptProcessor = null;
+            }
+
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+
+            if (socket) {
+                socket.emit('end_voice_session');
+                socket.disconnect();
+                socket = null;
+            }
+
+            updateStatus('Stopped');
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('muteBtn').disabled = true;
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            updateStatus(isMuted ? '🔇 Muted' : '🎤 Listening...');
+        }
+
+        function visualizeVolume() {
+            if (!analyser || !isActive) return;
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            const percentage = Math.min(100, (average / 128) * 100);
+
+            document.getElementById('volumeBar').style.width = percentage + '%';
+
+            requestAnimationFrame(visualizeVolume);
+        }
+
+        function playAudioBase64(base64Audio) {
+            try {
+                // Stop any currently playing audio
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                }
+
+                const audioBlob = base64ToBlob(base64Audio, 'audio/mpeg');
+                const audioUrl = URL.createObjectURL(audioBlob);
+                currentAudio = new Audio(audioUrl);
+                
+                currentAudio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    currentAudio = null;
+                };
+
+                currentAudio.play();
+            } catch (error) {
+                console.error('❌ Audio playback error:', error);
+            }
+        }
+
+        function base64ToBlob(base64, mimeType) {
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType });
+        }
+    </script>
+</body>
+</html>

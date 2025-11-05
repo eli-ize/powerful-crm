@@ -16,8 +16,8 @@ export interface UnifiedAIConfig {
  * - Anthropic Claude (Claude Sonnet 4.5)
  */
 export class UnifiedAIService {
-  private preferredProvider: AIProvider;
-  private fallbackEnabled: boolean;
+  private readonly preferredProvider: AIProvider;
+  private readonly fallbackEnabled: boolean;
 
   constructor(config: UnifiedAIConfig = {}) {
     this.preferredProvider = (process.env.AI_PROVIDER as AIProvider) || config.provider || 'auto';

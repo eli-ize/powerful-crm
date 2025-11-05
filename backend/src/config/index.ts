@@ -7,6 +7,7 @@ interface Config {
   port: number;
   nodeEnv: string;
   databaseUrl: string;
+  databaseProvider: 'azure-sql' | 'postgresql' | 'supabase';
   jwtSecret: string;
   jwtRefreshSecret: string;
   jwtExpiresIn: string;
@@ -14,15 +15,22 @@ interface Config {
   redisUrl: string;
   frontendUrl: string;
   backendUrl: string;
+  webhookUrl?: string; // Ngrok URL for webhooks (optional)
   
   // External APIs
   googlePlacesApiKey: string;
   telnyxApiKey: string;
   telnyxPublicKey: string;
   telnyxConnectionId: string;
+  telnyxPreferredRegion: string; // 'us', 'europe', 'asia'
   azureSpeechKey: string;
   azureSpeechRegion: string;
   openaiApiKey: string;
+  
+  // Alternative AI Providers (Cost-Optimized)
+  groqApiKey: string; // 10x cheaper LLM
+  elevenLabsApiKey: string; // High-quality TTS
+  anthropicApiKey: string; // Claude (alternative to GPT-4)
   
   // Azure OpenAI
   azureOpenAIKey: string;
@@ -76,9 +84,9 @@ function getOptionalEnvVar(key: string, defaultValue: string = ''): string {
 function getNumberEnvVar(key: string, defaultValue: number): number {
   const value = process.env[key];
   if (!value) return defaultValue;
-  const num = parseInt(value, 10);
-  if (isNaN(num)) {
-    throw new Error(`Environment variable ${key} must be a number`);
+  const num = Number.parseInt(value, 10);
+  if (Number.isNaN(num)) {
+    throw new TypeError(`Environment variable ${key} must be a number`);
   }
   return num;
 }
@@ -93,6 +101,7 @@ const config: Config = {
   port: getNumberEnvVar('PORT', 8000),
   nodeEnv: getOptionalEnvVar('NODE_ENV', 'development'),
   databaseUrl: getRequiredEnvVar('DATABASE_URL'),
+  databaseProvider: (getOptionalEnvVar('DATABASE_PROVIDER', 'postgresql') as any),
   jwtSecret: getRequiredEnvVar('JWT_SECRET'),
   jwtRefreshSecret: getRequiredEnvVar('JWT_REFRESH_SECRET'),
   jwtExpiresIn: getOptionalEnvVar('JWT_EXPIRES_IN', '15m'),
@@ -100,15 +109,22 @@ const config: Config = {
   redisUrl: getOptionalEnvVar('REDIS_URL', 'redis://localhost:6379'),
   frontendUrl: getOptionalEnvVar('FRONTEND_URL', 'http://localhost:3000'),
   backendUrl: getOptionalEnvVar('BACKEND_URL', 'http://localhost:8000'),
+  webhookUrl: getOptionalEnvVar('WEBHOOK_URL'), // Ngrok URL for webhooks
   
   // External APIs (optional for development)
   googlePlacesApiKey: getOptionalEnvVar('GOOGLE_PLACES_API_KEY'),
   telnyxApiKey: getOptionalEnvVar('TELNYX_API_KEY'),
   telnyxPublicKey: getOptionalEnvVar('TELNYX_PUBLIC_KEY'),
   telnyxConnectionId: getOptionalEnvVar('TELNYX_CONNECTION_ID'),
+  telnyxPreferredRegion: getOptionalEnvVar('TELNYX_PREFERRED_REGION', 'europe'), // Closest to SA
   azureSpeechKey: getOptionalEnvVar('AZURE_SPEECH_KEY'),
-  azureSpeechRegion: getOptionalEnvVar('AZURE_SPEECH_REGION', 'eastus'),
+  azureSpeechRegion: getOptionalEnvVar('AZURE_SPEECH_REGION', 'southafricanorth'), // SA region!
   openaiApiKey: getOptionalEnvVar('OPENAI_API_KEY'),
+  
+  // Alternative AI Providers (Cost-Optimized)
+  groqApiKey: getOptionalEnvVar('GROQ_API_KEY'), // 10x cheaper than GPT-4
+  elevenLabsApiKey: getOptionalEnvVar('ELEVENLABS_API_KEY'), // Better TTS than Azure
+  anthropicApiKey: getOptionalEnvVar('ANTHROPIC_API_KEY'), // Claude alternative
   
   // Azure OpenAI
   azureOpenAIKey: getOptionalEnvVar('AZURE_OPENAI_KEY'),

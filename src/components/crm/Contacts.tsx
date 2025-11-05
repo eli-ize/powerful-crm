@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
+import { api } from '../../utils/api';
+import { toast } from 'sonner';
 import { Input } from '../ui/input';
 import { Card, CardContent } from '../ui/card';
 import { Avatar, AvatarFallback } from '../ui/avatar';
@@ -14,26 +16,26 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
 interface Contact {
   id: string;
-  name: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
   email: string;
   phone: string;
   company: string;
-  status: 'lead' | 'customer' | 'partner';
-  value: string;
+  status: 'new' | 'qualified' | 'contacted' | 'customer' | 'partner';
+  value?: string;
+  source?: string;
+  location?: string;
+  website?: string;
+  customFields?: any;
 }
 
-const initialContacts: Contact[] = [
-  { id: '1', name: 'Sarah Johnson', email: 'sarah.j@techcorp.com', phone: '+1 555-0123', company: 'TechCorp', status: 'customer', value: '$45,000' },
-  { id: '2', name: 'Michael Chen', email: 'mchen@innovate.io', phone: '+1 555-0124', company: 'Innovate Inc', status: 'lead', value: '$12,000' },
-  { id: '3', name: 'Emily Davis', email: 'emily@startup.com', phone: '+1 555-0125', company: 'Startup Co', status: 'customer', value: '$78,000' },
-  { id: '4', name: 'James Wilson', email: 'jwilson@global.net', phone: '+1 555-0126', company: 'Global Solutions', status: 'partner', value: '$125,000' },
-  { id: '5', name: 'Amanda Rodriguez', email: 'arodriguez@design.co', phone: '+1 555-0127', company: 'Design Studio', status: 'lead', value: '$8,500' },
-  { id: '6', name: 'David Kim', email: 'dkim@enterprise.com', phone: '+1 555-0128', company: 'Enterprise LLC', status: 'customer', value: '$95,000' },
-];
+// Contacts will be loaded from API
 
-export function Contacts() {
-  const [contacts, setContacts] = useState<Contact[]>(initialContacts);
+export default function Contacts() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newContact, setNewContact] = useState<Partial<Contact>>({});
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -41,8 +43,35 @@ export function Contacts() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
 
+  // Load contacts from API
+  useEffect(() => {
+    loadContacts();
+  }, []);
+
+  const loadContacts = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.getContacts();
+      if (response.success && response.data) {
+        // Transform API data to match our interface
+        const transformedContacts = response.data.map((contact: any) => ({
+          ...contact,
+          name: contact.firstName && contact.lastName 
+            ? `${contact.firstName} ${contact.lastName}`
+            : contact.company,
+          status: contact.status || 'new'
+        }));
+        setContacts(transformedContacts);
+      }
+    } catch (error) {
+      toast.error('Failed to load contacts');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   let filteredContacts = contacts.filter(contact => {
-    const matchesSearch = contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = (contact.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.company.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filterStatus === 'all' || contact.status === filterStatus;
@@ -53,11 +82,11 @@ export function Contacts() {
   filteredContacts = [...filteredContacts].sort((a, b) => {
     switch (sortBy) {
       case 'name':
-        return a.name.localeCompare(b.name);
+        return (a.name || '').localeCompare(b.name || '');
       case 'company':
         return a.company.localeCompare(b.company);
       case 'value':
-        return parseFloat(b.value.replace(/[$,]/g, '')) - parseFloat(a.value.replace(/[$,]/g, ''));
+        return parseFloat((b.value || '0').replace(/[$,]/g, '')) - parseFloat((a.value || '0').replace(/[$,]/g, ''));
       default:
         return 0;
     }
@@ -280,10 +309,10 @@ export function Contacts() {
                 <div className="flex items-start justify-between mb-4 gap-2">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <Avatar className="flex-shrink-0">
-                      <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
+                      <AvatarFallback>{getInitials(contact.name || contact.company)}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <h4 className="mb-1 truncate">{contact.name}</h4>
+                      <h4 className="mb-1 truncate">{contact.name || contact.company}</h4>
                       <Badge className={getStatusColor(contact.status)}>
                         {contact.status}
                       </Badge>
@@ -346,10 +375,10 @@ export function Contacts() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <Avatar>
-                        <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
+                        <AvatarFallback>{getInitials(contact.name || contact.company)}</AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <h4 className="font-medium truncate">{contact.name}</h4>
+                        <h4 className="font-medium truncate">{contact.name || contact.company}</h4>
                         <p className="text-sm text-gray-500 truncate">{contact.company}</p>
                       </div>
                     </div>

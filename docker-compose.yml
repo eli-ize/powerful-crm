@@ -43,9 +43,7 @@ services:
     container_name: crm-backend
     environment:
       NODE_ENV: development
-      environment:
-      # NOTE: Development password only. Set POSTGRES_PASSWORD env var in production.
-      DATABASE_URL: postgresql://crmuser:${POSTGRES_PASSWORD:-changeme}@postgres:5432/powerfulcrm
+      DATABASE_URL: postgresql://crmuser:crmpass@postgres:5432/powerfulcrm
       REDIS_URL: redis://redis:6379
       JWT_SECRET: your-super-secret-jwt-key-min-32-chars-long-dev
       JWT_REFRESH_SECRET: your-super-secret-refresh-key-min-32-chars-long-dev

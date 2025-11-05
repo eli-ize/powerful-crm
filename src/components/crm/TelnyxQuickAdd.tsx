@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { AlertCircle, CheckCircle, Phone, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ApiKeyManager } from '../../services/apiKeyManager';
 
 interface TelnyxQuickAddProps {
   onNavigateToSetup?: () => void;
@@ -15,43 +16,40 @@ export function TelnyxQuickAdd({ onNavigateToSetup }: TelnyxQuickAddProps) {
   const [apiKey, setApiKey] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
 
-  const savedKeys = localStorage.getItem('crm_api_keys');
-  const apiKeys = savedKeys ? JSON.parse(savedKeys) : {};
-  const hasTelnyxKey = !!apiKeys.telnyx;
+  const hasTelnyxKey = ApiKeyManager.hasApiKey('telnyx');
+  const telnyxConfig = ApiKeyManager.getApiKey('telnyx');
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!apiKey) {
       toast.error('Please enter your Telnyx API key');
       return;
     }
 
-    if (!apiKey.startsWith('KEY')) {
-      toast.error('Invalid Telnyx API key format', {
-        description: 'Telnyx API keys start with "KEY..."',
-      });
-      return;
-    }
-
-    const updated = { ...apiKeys, telnyx: apiKey };
-    localStorage.setItem('crm_api_keys', JSON.stringify(updated));
-    
-    if (phoneNumber) {
-      localStorage.setItem('telnyx_phone_number', phoneNumber);
+    try {
+      // Use ApiKeyManager to validate, test, and save
+      const additionalConfig = phoneNumber ? { phoneNumber } : undefined;
+      await ApiKeyManager.saveApiKey('telnyx', apiKey, additionalConfig);
+      
       toast.success('Telnyx configured successfully!', {
-        description: `Caller ID set to ${phoneNumber}`,
+        description: phoneNumber 
+          ? `Caller ID set to ${phoneNumber}` 
+          : 'API key validated and saved',
       });
-    } else {
-      toast.success('Telnyx API key saved!', {
-        description: 'Click "Test Connection" to verify and auto-detect your phone number',
+      
+      setApiKey('');
+      window.location.reload(); // Reload to update UI
+    } catch (error) {
+      toast.error('Failed to save Telnyx API key', {
+        description: error instanceof Error ? error.message : 'Unknown error',
       });
     }
-    
-    setApiKey('');
-    window.location.reload(); // Reload to update UI
   };
 
   if (hasTelnyxKey) {
-    const configuredNumber = localStorage.getItem('telnyx_phone_number');
+    // Get phone number from discovered resources or localStorage fallback
+    const serviceConfig = ApiKeyManager.getServiceConfig('telnyx');
+    const configuredNumber = (serviceConfig as any)?.phoneNumbers?.[0]?.phoneNumber 
+      || localStorage.getItem('telnyx_phone_number');
     
     return (
       <Card className="border-blue-200 bg-blue-50">

@@ -43,8 +43,10 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
   const settingsItems = [
     ...(user?.permissions.canManageUsers ? [{ id: 'user-management', label: 'Users', icon: Shield }] : []),
-    { id: 'telnyx-manager', label: 'Telnyx PBX', icon: Phone },
+    { id: 'phone-system', label: 'Phone System', icon: Phone },
     { id: 'api-setup', label: 'API Setup', icon: Key },
+    { id: 'azure-speech-testing', label: 'Azure Speech Testing', icon: Sparkles },
+    { id: 'voice-call-simulator', label: 'Voice Call Simulator', icon: Phone },
   ];
 
   return (

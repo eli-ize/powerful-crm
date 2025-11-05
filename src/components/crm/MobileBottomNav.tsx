@@ -7,10 +7,11 @@ import { useAuth } from '../auth/AuthContext';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { TouchBackend } from 'react-dnd-touch-backend';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface MobileBottomNavProps {
-  activeView: string;
-  onViewChange: (view: string) => void;
+  activeView?: string;
+  onViewChange?: (view: string) => void;
 }
 
 interface MenuItem {
@@ -123,10 +124,15 @@ function DraggableNavItem({ item, index, moveItem, swapBetweenSections, isEditin
   );
 }
 
-function MobileBottomNavContent({ activeView, onViewChange }: MobileBottomNavProps) {
+function MobileBottomNavContent({ activeView: activeViewProp, onViewChange }: MobileBottomNavProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  // Derive activeView from URL if not provided
+  const activeView = activeViewProp || location.pathname.slice(1) || 'dashboard';
 
   const allMenuItems: MenuItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'main' },
@@ -239,7 +245,11 @@ function MobileBottomNavContent({ activeView, onViewChange }: MobileBottomNavPro
 
   const handleNavClick = (itemId: string) => {
     if (isEditing) return;
-    onViewChange(itemId);
+    if (onViewChange) {
+      onViewChange(itemId);
+    } else {
+      navigate(`/${itemId}`);
+    }
     setIsMenuOpen(false);
   };
 
