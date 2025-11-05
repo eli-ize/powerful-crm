@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import config from '../config';
 import logger from '../utils/logger';
 import { ChatMessage, ChatCompletionRequest, ChatCompletionResponse, ConversationContext } from './azureOpenAI';
 
@@ -148,7 +147,8 @@ Remember: You're on a phone call. Be natural, conversational, and concise.`;
     response: string,
     currentStage: string
   ): { response: string; nextStage: string; confidence: number } {
-    const stageMatch = response.match(/\[STAGE:(\w+)\|CONFIDENCE:([\d.]+)\]/);
+    const stageRegex = /\[STAGE:(\w+)\|CONFIDENCE:([\d.]+)\]/;
+    const stageMatch = stageRegex.exec(response);
     
     let nextStage = currentStage;
     let confidence = 0.5;
@@ -156,7 +156,7 @@ Remember: You're on a phone call. Be natural, conversational, and concise.`;
 
     if (stageMatch) {
       nextStage = stageMatch[1];
-      confidence = parseFloat(stageMatch[2]);
+      confidence = Number.parseFloat(stageMatch[2]);
       cleanResponse = response.replace(/\[STAGE:.*?\]/, '').trim();
     }
 

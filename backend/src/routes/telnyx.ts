@@ -1,8 +1,54 @@
 // @ts-nocheck
 import { Router, Request, Response } from 'express';
 import logger from '../utils/logger';
+import azureOpenAI from '../services/azureOpenAI';
+import azureSpeech from '../services/azureSpeech';
+import VoiceCallHandler from '../services/voiceCallHandler';
 
 const router = Router();
+
+// 🎭 Sentiment Analysis for Phone Calls
+interface SentimentResult {
+  emotion: 'excited' | 'happy' | 'neutral' | 'concerned' | 'frustrated' | 'angry' | 'sad';
+  score: number;
+  confidence: number;
+}
+
+function analyzeSentiment(text: string): SentimentResult {
+  const lowerText = text.toLowerCase();
+  
+  const emotionPatterns = {
+    excited: { keywords: ['amazing', 'excited', 'awesome', 'fantastic', 'love it', 'perfect', 'incredible', '!'], weight: 0.9 },
+    happy: { keywords: ['happy', 'great', 'good', 'nice', 'thanks', 'appreciate', 'glad', 'pleased'], weight: 0.7 },
+    frustrated: { keywords: ['frustrated', 'annoying', 'terrible', 'awful', 'hate', 'worst', 'useless'], weight: -0.8 },
+    angry: { keywords: ['angry', 'furious', 'outraged', 'unacceptable', 'ridiculous'], weight: -0.9 },
+    sad: { keywords: ['sad', 'disappointed', 'unhappy', 'unfortunate', 'sorry'], weight: -0.6 },
+    concerned: { keywords: ['worried', 'concerned', 'not sure', 'confused', 'unsure', 'hesitant'], weight: -0.4 }
+  };
+  
+  let totalScore = 0;
+  let matchCount = 0;
+  let detectedEmotion: SentimentResult['emotion'] = 'neutral';
+  let maxWeight = 0;
+  
+  for (const [emotion, pattern] of Object.entries(emotionPatterns)) {
+    for (const keyword of pattern.keywords) {
+      if (lowerText.includes(keyword)) {
+        totalScore += pattern.weight;
+        matchCount++;
+        if (Math.abs(pattern.weight) > Math.abs(maxWeight)) {
+          maxWeight = pattern.weight;
+          detectedEmotion = emotion as SentimentResult['emotion'];
+        }
+      }
+    }
+  }
+  
+  const normalizedScore = matchCount > 0 ? totalScore / matchCount : 0;
+  const confidence = Math.min(matchCount / 3, 1);
+  
+  return { emotion: detectedEmotion, score: normalizedScore, confidence };
+}
 
 // Save Telnyx configuration
 router.post('/config', async (req: Request, res: Response) => {
@@ -22,7 +68,7 @@ router.post('/config', async (req: Request, res: Response) => {
       hasConnectionId: !!connectionId,
     });
 
-    // NOTE: Database persistence to be implemented with Prisma schema
+    // TODO: Save to database (Prisma)
     // For now, just acknowledge receipt
     // In production, you would save this to a database table
     // Example:
@@ -91,7 +137,7 @@ router.post('/numbers', async (req: Request, res: Response) => {
 
     logger.info('Saving phone numbers', { count: numbers.length });
 
-    // NOTE: Database persistence to be implemented
+    // TODO: Save to database
     // await prisma.telnyxNumber.createMany({ data: numbers });
 
     res.json({
@@ -111,8 +157,8 @@ router.post('/numbers', async (req: Request, res: Response) => {
 // Get phone numbers
 router.get('/numbers', async (_req: Request, res: Response) => {
   try {
-    // Database persistence pending - currently returns empty array
-    // Future implementation: const numbers = await prisma.telnyxNumber.findMany();
+    // TODO: Retrieve from database
+    // const numbers = await prisma.telnyxNumber.findMany();
 
     res.json({
       success: true,
@@ -361,76 +407,6 @@ router.get('/sip-credentials', async (_req: Request, res: Response) => {
   }
 });
 
-// Helper function to update app with outbound profile
-async function updateAppWithProfile(apiKey: string, connectionId: string, profileId: string) {
-  await fetch(`https://api.telnyx.com/v2/call_control_applications/${connectionId}`, {
-    method: 'PATCH',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      outbound_voice_profile_id: profileId,
-    }),
-  });
-  logger.info(`Updated app with outbound profile`);
-}
-
-// Helper function to create new call control app
-async function createCallControlApp(apiKey: string, backendUrl: string, outboundProfileId: string | null) {
-  const appPayload: any = {
-    application_name: `Powerful CRM Call Control ${Date.now()}`,
-    webhook_event_url: `${backendUrl}/api/telnyx/webhook`,
-    webhook_event_failover_url: '',
-    webhook_timeout_secs: 25,
-    active: true,
-  };
-
-  if (outboundProfileId) {
-    appPayload.outbound_voice_profile_id = outboundProfileId;
-  }
-
-  const appResponse = await fetch('https://api.telnyx.com/v2/call_control_applications', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(appPayload),
-  });
-
-  const appData = await appResponse.json();
-  if (!appResponse.ok) {
-    throw new Error(appData.errors?.[0]?.detail || 'Failed to create Call Control Application');
-  }
-
-  return appData.data;
-}
-
-// Helper function to get or create outbound profile
-async function getOutboundProfile(apiKey: string) {
-  const profilesResponse = await fetch('https://api.telnyx.com/v2/outbound_voice_profiles', {
-    headers: { 'Authorization': `Bearer ${apiKey}` },
-  });
-  
-  if (!profilesResponse.ok) {
-    throw new Error('Failed to fetch outbound voice profiles');
-  }
-  
-  const profilesData: any = await profilesResponse.json();
-  return profilesData.data && profilesData.data.length > 0 ? profilesData.data[0].id : null;
-}
-
-// Helper function to get existing call control app
-async function getExistingCallControlApp(apiKey: string, appName: string) {
-  const response = await fetch('https://api.telnyx.com/v2/call_control_applications', {
-    headers: { 'Authorization': `Bearer ${apiKey}` },
-  });
-  
-  const data: any = await response.json();
-  return data.data?.find((app: any) => app.application_name === appName);
-}
-
 // Auto-setup Telnyx - Creates Call Control App with Outbound Profile
 router.post('/auto-setup', async (req: Request, res: Response) => {
   try {
@@ -448,38 +424,110 @@ router.post('/auto-setup', async (req: Request, res: Response) => {
     const config = await import('../config');
     const backendUrl = config.default.backendUrl;
 
-    // Step 1: Get outbound voice profile
-    const outboundProfileId = await getOutboundProfile(apiKey);
-    if (outboundProfileId) {
+    // Step 1: Get outbound voice profiles
+    const profilesResponse = await fetch('https://api.telnyx.com/v2/outbound_voice_profiles', {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+    });
+
+    if (!profilesResponse.ok) {
+      throw new Error('Failed to fetch outbound voice profiles');
+    }
+
+    const profilesData: any = await profilesResponse.json();
+    
+    let outboundProfileId = null;
+    if (profilesData.data && profilesData.data.length > 0) {
+      outboundProfileId = profilesData.data[0].id;
       logger.info(`Using existing outbound profile: ${outboundProfileId}`);
     }
 
-    // Step 2: Check if app already exists
-    const appName = 'Powerful CRM Call Control';
-    let appData: any = await getExistingCallControlApp(apiKey, appName);
-    let connectionId = null;
+    // Step 2: Check if app already exists, otherwise create it
+    const existingAppsResponse = await fetch('https://api.telnyx.com/v2/call_control_applications', {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+    });
 
-    if (appData) {
-      connectionId = appData.id;
+    const existingAppsData: any = await existingAppsResponse.json();
+    let connectionId = null;
+    let appData: any = null;
+
+    // Look for existing "Powerful CRM" app
+    const existingApp = existingAppsData.data?.find((app: any) => 
+      app.application_name.includes('Powerful CRM')
+    );
+
+    if (existingApp) {
+      connectionId = existingApp.id;
+      appData = { data: existingApp };
       logger.info(`Using existing Call Control Application: ${connectionId}`);
 
       // Update it with the outbound profile if missing
-      if (outboundProfileId && !appData.outbound_voice_profile_id) {
-        await updateAppWithProfile(apiKey, connectionId, outboundProfileId);
+      if (outboundProfileId && !existingApp.outbound_voice_profile_id) {
+        await fetch(`https://api.telnyx.com/v2/call_control_applications/${connectionId}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            outbound_voice_profile_id: outboundProfileId,
+          }),
+        });
+        logger.info(`Updated existing app with outbound profile`);
       }
     } else {
       // Create new app
-      const newApp = await createCallControlApp(apiKey, backendUrl, outboundProfileId);
-      connectionId = newApp.id;
+      const appPayload: any = {
+        application_name: `Powerful CRM Call Control ${Date.now()}`,
+        webhook_event_url: `${backendUrl}/api/telnyx/webhook`,
+        webhook_event_failover_url: '',
+        webhook_timeout_secs: 25,
+        active: true,
+      };
+
+      if (outboundProfileId) {
+        appPayload.outbound_voice_profile_id = outboundProfileId;
+      }
+
+      const appResponse = await fetch('https://api.telnyx.com/v2/call_control_applications', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appPayload),
+      });
+
+      appData = await appResponse.json();
+
+      if (!appResponse.ok) {
+        throw new Error(appData.errors?.[0]?.detail || 'Failed to create Call Control Application');
+      }
+
+      connectionId = appData.data.id;
       logger.info(`Created new Call Control Application: ${connectionId}`);
     }
 
-    // Step 3: If no outbound profile was assigned, get first available and update
-    if (!outboundProfileId) {
-      const firstProfile = await getOutboundProfile(apiKey);
-      if (firstProfile && connectionId) {
-        await updateAppWithProfile(apiKey, connectionId, firstProfile);
-        outboundProfileId = firstProfile;
+    // Step 3: If no outbound profile was assigned, try to update it
+    if (!outboundProfileId && profilesData.data && profilesData.data.length > 0) {
+      outboundProfileId = profilesData.data[0].id;
+      
+      const updateResponse = await fetch(`https://api.telnyx.com/v2/call_control_applications/${connectionId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          outbound_voice_profile_id: outboundProfileId,
+        }),
+      });
+
+      if (updateResponse.ok) {
+        logger.info(`Updated app with outbound profile: ${outboundProfileId}`);
       }
     }
 
@@ -538,14 +586,48 @@ router.post('/webhook', async (req: Request, res: Response) => {
     // Handle different call events
     switch (eventType) {
       case 'call.initiated':
-        logger.info('Incoming call initiated', {
+        logger.info('Call initiated', {
           from: payload?.from,
           to: payload?.to,
           callControlId: payload?.call_control_id,
+          direction: payload?.direction,
         });
         
-        // Answer the call
+        // Extract AI purpose from custom headers (for outbound calls)
+        const customHeaders = payload?.custom_headers || [];
+        const purposeHeader = customHeaders.find((h: any) => h.name === 'X-AI-Purpose');
+        const contextHeader = customHeaders.find((h: any) => h.name === 'X-AI-Context');
+        
+        const aiPurpose = purposeHeader?.value || 'general';
+        let aiContext = {};
+        try {
+          aiContext = contextHeader ? JSON.parse(contextHeader.value) : {};
+        } catch (e) {
+          logger.error('Failed to parse AI context:', e);
+        }
+        
+        logger.info('AI Call Context', {
+          purpose: aiPurpose,
+          context: aiContext,
+          direction: payload?.direction
+        });
+        
+        // Initialize AI call session with purpose and context
         if (payload?.call_control_id) {
+          const session = VoiceCallHandler.initSession(
+            payload.call_control_id,
+            payload.from,
+            payload.to
+          );
+          
+          // Store purpose and context in session
+          session.purpose = aiPurpose;
+          session.context = aiContext;
+        }
+        
+        // For INBOUND calls, answer immediately
+        // For OUTBOUND calls, wait for customer to answer
+        if (payload?.direction === 'incoming' && payload?.call_control_id) {
           await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/answer`, {
             method: 'POST',
             headers: {
@@ -559,22 +641,59 @@ router.post('/webhook', async (req: Request, res: Response) => {
       case 'call.answered':
         logger.info('Call answered', {
           callControlId: payload?.call_control_id,
+          from: payload?.from,
+          to: payload?.to,
         });
         
-        // Speak a message when call is answered
+        // 🤖 AI-POWERED GREETING
         if (payload?.call_control_id) {
-          await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/speak`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${(await import('../config')).default.telnyxApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              payload: 'Hello! This is Powerful CRM. Your call has been received.',
-              voice: 'female',
-              language: 'en-US',
-            }),
-          });
+          try {
+            const session = VoiceCallHandler.getSession(payload.call_control_id);
+            
+            if (session) {
+              // Generate AI greeting
+              const greeting = await VoiceCallHandler.generateGreeting(session);
+
+              // Generate high-quality Azure Speech audio (en-ZA-LeahNeural)
+              const audioBuffer = await azureSpeech.textToSpeech(greeting, { voice: "en-ZA-LeahNeural", language: "en-ZA" });
+              const audioBase64 = audioBuffer.toString('base64');
+
+              // Play Azure Speech audio for natural voice quality
+              await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/playback_start`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${(await import('../config')).default.telnyxApiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  audio_url: `data:audio/wav;base64,${audioBase64}`,
+                }),
+              });
+
+              logger.info('✅ AI greeting delivered');
+            }
+
+          } catch (error) {
+            logger.error('❌ AI greeting failed:', error);
+            
+            // Fallback greeting with Azure Speech
+            const fallbackMessage = 'Hello! Thank you for calling Powerful CRM.';
+            const audioBuffer = await azureSpeech.textToSpeech(fallbackMessage, { voice: "en-ZA-LeahNeural", language: "en-ZA" });
+            const audioBase64 = audioBuffer.toString('base64');
+            
+            await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/playback_start`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${(await import('../config')).default.telnyxApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                audio_url: `data:audio/wav;base64,${audioBase64}`,
+                voice: 'female',
+                language: 'en-US',
+              }),
+            });
+          }
         }
         break;
 
@@ -583,22 +702,191 @@ router.post('/webhook', async (req: Request, res: Response) => {
           callControlId: payload?.call_control_id,
           hangupCause: payload?.hangup_cause,
         });
+        
+        // End AI session and generate summary
+        if (payload?.call_control_id) {
+          await VoiceCallHandler.endSession(payload.call_control_id);
+        }
         break;
 
       case 'call.speak.ended':
-        logger.info('Speech ended', {
+      case 'call.playback.ended': // Azure Speech uses playback instead of speak
+        logger.info('Speech ended, waiting before listening for caller response', {
           callControlId: payload?.call_control_id,
         });
         
-        // Hang up after speaking
+        // 🎤 CAPTURE CALLER AUDIO
+        // Note: Telnyx provides ephemeral storage (auto-deleted after 7 days)
+        // We immediately download, transcribe with Azure, and process - Telnyx is just the phone line
         if (payload?.call_control_id) {
-          await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/hangup`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${(await import('../config')).default.telnyxApiKey}`,
-              'Content-Type': 'application/json',
-            },
-          });
+          const config = (await import('../config')).default;
+          
+          setTimeout(async () => {
+            try {
+              // Start capturing caller audio (temporary Telnyx storage, we process it)
+              await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/record_start`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${config.telnyxApiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  format: 'wav',
+                  channels: 'single',
+                  play_beep: false,
+                  max_length: 30,
+                }),
+              });
+              
+              logger.info('🎤 Capturing caller audio (Telnyx temp storage, we process with Azure)');
+              
+              // Auto-stop after 8 seconds if caller is silent
+              setTimeout(async () => {
+                try {
+                  const session = VoiceCallHandler.getSession(payload.call_control_id);
+                  if (session) {
+                    await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/record_stop`, {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${config.telnyxApiKey}`,
+                      },
+                    });
+                    logger.info('⏱️ Stopped capture - will transcribe with Azure Speech');
+                  }
+                } catch (error) {
+                  logger.error('Error stopping capture:', error);
+                }
+              }, 8000);
+            } catch (error) {
+              logger.error('Error starting audio capture:', error);
+            }
+          }, 500);
+        }
+        break;
+
+      case 'call.recording.saved':
+        // 🎤 CALLER AUDIO AVAILABLE - Process with our Azure AI
+        // Telnyx just provided temp storage, we handle all intelligence
+        logger.info('📼 Caller audio ready, processing with Azure Speech & AI', {
+          callControlId: payload?.call_control_id,
+        });
+        
+        if (payload?.call_control_id && payload?.recording_urls?.wav) {
+          try {
+            const session = VoiceCallHandler.getSession(payload.call_control_id);
+            
+            if (session) {
+              // Download audio from Telnyx temp storage
+              const config = (await import('../config')).default;
+              const audioResponse = await fetch(payload.recording_urls.wav, {
+                headers: {
+                  'Authorization': `Bearer ${config.telnyxApiKey}`,
+                },
+              });
+              
+              const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
+              
+              // 🧠 OUR AZURE AI PROCESSES EVERYTHING
+              // Transcribe with Azure Speech (not Telnyx)
+              const callerText = await VoiceCallHandler.transcribeAudio(audioBuffer);
+              
+              logger.info('📝 Transcribed caller:', { callerText });
+              
+              // 🎭 ANALYZE EMOTION from transcribed text
+              const sentiment = analyzeSentiment(callerText);
+              logger.info('🎭 Caller emotion detected:', { 
+                emotion: sentiment.emotion, 
+                score: sentiment.score,
+                confidence: sentiment.confidence 
+              });
+              
+              // Generate AI response with emotion awareness
+              const aiResponse = await VoiceCallHandler.processCallerInputWithEmotion(
+                session,
+                callerText,
+                sentiment
+              );
+              
+              logger.info('🤖 AI response:', { aiResponse });
+              
+              // Check if conversation should end
+              if (aiResponse.toLowerCase().includes('goodbye') || 
+                  aiResponse.toLowerCase().includes('thank you for calling')) {
+                // Generate high-quality Azure Speech audio
+                const audioBuffer = await azureSpeech.textToSpeech(aiResponse, { voice: "en-ZA-LeahNeural", language: "en-ZA" });
+                const audioBase64 = audioBuffer.toString('base64');
+                
+                // Play Azure Speech audio (much better quality than Telnyx TTS)
+                await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/playback_start`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${config.telnyxApiKey}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    audio_url: `data:audio/wav;base64,${audioBase64}`,
+                  }),
+                });
+                
+                // Schedule hangup after Azure Speech finishes
+                setTimeout(async () => {
+                  await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/hangup`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${config.telnyxApiKey}`,
+                    },
+                  });
+                }, 3000);
+                
+              } else {
+                // Continue conversation - use Azure Speech for high quality
+                const audioBuffer = await azureSpeech.textToSpeech(aiResponse, { voice: "en-ZA-LeahNeural", language: "en-ZA" });
+                const audioBase64 = audioBuffer.toString('base64');
+                
+                await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/playback_start`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${config.telnyxApiKey}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    audio_url: `data:audio/wav;base64,${audioBase64}`,
+                  }),
+                });
+                // When playback ends, call.playback.ended will trigger and start recording again
+              }
+              
+            }
+          } catch (error) {
+            logger.error('❌ Failed to process caller input:', error);
+            
+            // Apologize and hang up on error using Azure Speech
+            const errorMessage = 'I apologize, but I\'m having technical difficulties. Please try again later. Goodbye.';
+            const audioBuffer = await azureSpeech.textToSpeech(errorMessage, { voice: "en-ZA-LeahNeural", language: "en-ZA" });
+            const audioBase64 = audioBuffer.toString('base64');
+            
+            await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/playback_start`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${(await import('../config')).default.telnyxApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                audio_url: `data:audio/wav;base64,${audioBase64}`,
+                voice: 'female',
+                language: 'en-US',
+              }),
+            });
+            
+            setTimeout(async () => {
+              await fetch(`https://api.telnyx.com/v2/calls/${payload.call_control_id}/actions/hangup`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${(await import('../config')).default.telnyxApiKey}`,
+                },
+              });
+            }, 3000);
+          }
         }
         break;
 

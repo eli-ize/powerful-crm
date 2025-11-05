@@ -1,22 +1,32 @@
 import { Router, Request, Response } from 'express';
 import logger from '../utils/logger';
+import { PrismaClient } from '@prisma/client';
 
 const router = Router();
+const prisma = new PrismaClient();
 
 // Get all contacts
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    // TODO: Implement with Prisma
-    logger.info('Fetching contacts');
+    logger.info('Fetching contacts from database');
+
+    const contacts = await prisma.contact.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
 
     res.json({
       success: true,
-      data: {
-        contacts: [],
-        total: 0,
-        page: 1,
-        totalPages: 0,
-      },
+      data: contacts, // Return contacts directly, not nested
     });
   } catch (error) {
     logger.error('Error fetching contacts:', error);
@@ -30,17 +40,43 @@ router.get('/', async (_req: Request, res: Response) => {
 // Create contact
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const contact = req.body;
-    logger.info('Creating contact:', contact);
+    const contactData = req.body;
+    logger.info('Creating contact:', contactData);
 
-    // TODO: Implement with Prisma
+    // Get userId from request (you might want to get this from auth middleware)
+    const userId = contactData.userId || 'a11f9e24-8631-46b5-bdb8-b5cfcb973140'; // Test user
+
+    const contact = await prisma.contact.create({
+      data: {
+        user: {
+          connect: { id: userId }
+        },
+        company: contactData.company || '',
+        firstName: contactData.firstName || '',
+        lastName: contactData.lastName || '',
+        email: contactData.email,
+        phone: contactData.phone,
+        status: contactData.status || 'NEW',
+        website: contactData.website,
+        industry: contactData.industry,
+        location: contactData.location,
+        source: contactData.source,
+        title: contactData.title,
+        tags: contactData.tags,
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
     res.status(201).json({
       success: true,
-      data: {
-        id: 'contact_' + Date.now(),
-        ...contact,
-        createdAt: new Date().toISOString(),
-      },
+      data: contact,
     });
   } catch (error) {
     logger.error('Error creating contact:', error);

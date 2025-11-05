@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -27,125 +27,50 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '../ui/progress';
+import { autopilotAPI, DEFAULT_AUTOPILOT_CONFIG, AutopilotConfig, AutopilotTask, AutopilotStatus } from '../../services/autopilotAPI';
 
-interface AutopilotTask {
-  id: string;
-  type: 'find_leads' | 'qualify_leads' | 'analyze_website' | 'make_calls' | 'assign_designer' | 'send_emails';
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
-  progress: number;
-  result?: any;
-  assignedTo?: string;
-  createdAt: Date;
-  completedAt?: Date;
-}
-
-interface AutopilotConfig {
-  enabled: boolean;
-  industry: string;
-  leadFinding: {
-    enabled: boolean;
-    searchQuery: string;
-    targetCount: number;
-  };
-  qualification: {
-    enabled: boolean;
-    websiteAnalysis: boolean;
-    aiCriteria: string[];
-  };
-  calling: {
-    enabled: boolean;
-    dailyLimit: number;
-    voiceId: string;
-  };
-  taskAssignment: {
-    enabled: boolean;
-    autoAssignDesigner: boolean;
-    designerPool: string[];
-  };
-  emailAutomation: {
-    enabled: boolean;
-    sendAfterDemo: boolean;
-    followUpDays: number;
-  };
-}
+// Types imported from autopilotAPI service
 
 export function AutopilotMode() {
   const [isActive, setIsActive] = useState(false);
-  const [config, setConfig] = useState<AutopilotConfig>({
-    enabled: false,
-    industry: 'web_design',
-    leadFinding: {
-      enabled: true,
-      searchQuery: 'restaurants in Miami',
-      targetCount: 100,
-    },
-    qualification: {
-      enabled: true,
-      websiteAnalysis: true,
-      aiCriteria: ['No Website', 'Outdated Design', 'Poor SEO'],
-    },
-    calling: {
-      enabled: true,
-      dailyLimit: 200,
-      voiceId: 'professional_female',
-    },
-    taskAssignment: {
-      enabled: true,
-      autoAssignDesigner: true,
-      designerPool: ['John Designer', 'Sarah Creative', 'Mike Graphics'],
-    },
-    emailAutomation: {
-      enabled: true,
-      sendAfterDemo: true,
-      followUpDays: 3,
-    },
-  });
+  const [config, setConfig] = useState<AutopilotConfig>(DEFAULT_AUTOPILOT_CONFIG);
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiConnected, setApiConnected] = useState(false);
+  const [tasks, setTasks] = useState<AutopilotTask[]>([]);
 
-  const [tasks, setTasks] = useState<AutopilotTask[]>([
-    {
-      id: '1',
-      type: 'find_leads',
-      status: 'completed',
-      progress: 100,
-      result: { found: 150, qualified: 89 },
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      completedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
-    },
-    {
-      id: '2',
-      type: 'analyze_website',
-      status: 'completed',
-      progress: 100,
-      result: { analyzed: 89, needsWork: 67 },
-      createdAt: new Date(Date.now() - 1.5 * 60 * 60 * 1000),
-      completedAt: new Date(Date.now() - 45 * 60 * 1000),
-    },
-    {
-      id: '3',
-      type: 'make_calls',
-      status: 'in_progress',
-      progress: 45,
-      result: { called: 30, booked: 8 },
-      createdAt: new Date(Date.now() - 30 * 60 * 1000),
-    },
-    {
-      id: '4',
-      type: 'assign_designer',
-      status: 'completed',
-      progress: 100,
-      result: { assigned: 8 },
-      assignedTo: 'John Designer (3), Sarah Creative (3), Mike Graphics (2)',
-      createdAt: new Date(Date.now() - 20 * 60 * 1000),
-      completedAt: new Date(Date.now() - 15 * 60 * 1000),
-    },
-    {
-      id: '5',
-      type: 'send_emails',
-      status: 'pending',
-      progress: 0,
-      createdAt: new Date(),
-    },
-  ]);
+  // Initialize component with API data
+  useEffect(() => {
+    const initializeAutopilot = async () => {
+      try {
+        // Test API connection
+        const connected = await autopilotAPI.testConnection();
+        setApiConnected(connected);
+        
+        if (connected) {
+          // Load existing configuration
+          const existingConfig = await autopilotAPI.getConfig();
+          if (existingConfig) {
+            setConfig(existingConfig);
+          }
+          
+          // Load current status
+          const status = await autopilotAPI.getStatus();
+          setIsActive(status.status === 'active');
+          
+          // Load current tasks
+          const currentTasks = await autopilotAPI.getTasks();
+          setTasks(currentTasks);
+        } else {
+          toast.warning('Autopilot API is not available. Using demo mode.');
+        }
+      } catch (error) {
+        console.error('Failed to initialize autopilot:', error);
+        toast.error('Failed to connect to autopilot system');
+      }
+    };
+    
+    initializeAutopilot();
+  }, []);
 
   const [stats, setStats] = useState({
     leadsFound: 150,
@@ -157,24 +82,74 @@ export function AutopilotMode() {
     revenue: 0,
   });
 
-  const handleToggleAutopilot = () => {
-    if (isActive) {
-      setIsActive(false);
-      toast.info('Autopilot paused');
-    } else {
-      setIsActive(true);
-      toast.success('Autopilot activated! AI is now working...', {
-        description: 'The system will find leads, qualify them, make calls, and assign tasks automatically.',
-      });
-      
-      // Simulate progress
-      setTimeout(() => {
-        setStats(prev => ({
-          ...prev,
-          leadsFound: prev.leadsFound + 20,
-        }));
-      }, 5000);
+  const handleToggleAutopilot = async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    
+    try {
+      if (isActive) {
+        // Stop autopilot
+        const success = await autopilotAPI.stop();
+        if (success) {
+          setIsActive(false);
+          toast.info('Autopilot paused successfully');
+        } else {
+          toast.error('Failed to stop autopilot');
+        }
+      } else {
+        // Save current config first
+        await autopilotAPI.saveConfig(config);
+        
+        // Start autopilot
+        const success = await autopilotAPI.start();
+        if (success) {
+          setIsActive(true);
+          toast.success('Autopilot activated! AI is now working...', {
+            description: 'The system will find leads, qualify them, make calls, and assign tasks automatically.',
+          });
+          
+          // Start polling for updates
+          pollForUpdates();
+        } else {
+          toast.error('Failed to start autopilot');
+        }
+      }
+    } catch (error) {
+      console.error('Autopilot toggle failed:', error);
+      toast.error('Failed to toggle autopilot. Please check your connection.');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const pollForUpdates = () => {
+    const interval = setInterval(async () => {
+      try {
+        const status = await autopilotAPI.getStatus();
+        const tasks = await autopilotAPI.getTasks(10);
+        
+        // Update state with real data
+        setTasks(tasks);
+        
+        if (status.stats) {
+          setStats(prev => ({
+            ...prev,
+            ...status.stats,
+            qualified: status.stats?.leadsFound || prev.qualified, // Map leadsFound to qualified if needed
+          }));
+        }
+        
+        // Stop polling if autopilot is no longer active
+        if (status.status !== 'active') {
+          clearInterval(interval);
+          setIsActive(false);
+        }
+      } catch (error) {
+        console.error('Failed to poll autopilot status:', error);
+        clearInterval(interval);
+      }
+    }, 3000); // Poll every 3 seconds
   };
 
   const getTaskIcon = (type: string) => {

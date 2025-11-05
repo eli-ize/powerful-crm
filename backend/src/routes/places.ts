@@ -5,7 +5,74 @@ import logger from '../utils/logger';
 
 const router = express.Router();
 
-// Search places endpoint
+// Search places endpoint (POST version for API testing)
+router.post('/search',
+  [
+    body('query').notEmpty().withMessage('Search query is required'),
+    body('location').optional().isString(),
+    body('maxResults').optional().isInt({ min: 1, max: 60 }),
+    body('radius').optional().isInt({ min: 100, max: 50000 }),
+    body('type').optional().isString(),
+    body('minRating').optional().isFloat({ min: 0, max: 5 }),
+    body('openNow').optional().isBoolean(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array(),
+        });
+      }
+
+      const {
+        query: searchQuery,
+        location,
+        maxResults = 20,
+        radius,
+        type,
+        minRating,
+        openNow,
+      } = req.body;
+
+      const params = {
+        query: searchQuery as string,
+        location: location as string,
+        radius: radius ? parseInt(radius as string) : undefined,
+        type: type as string,
+        minRating: minRating ? parseFloat(minRating as string) : undefined,
+        openNow: openNow === true,
+      };
+
+      logger.info(`Places search request (POST): ${searchQuery}`, { 
+        userId: (req as any).user?.id,
+        params 
+      });
+
+      const results = await googlePlacesService.searchPlaces(params);
+
+      // Limit results
+      const limitedResults = results.results?.slice(0, maxResults) || [];
+
+      res.json({
+        success: true,
+        data: limitedResults,
+        count: limitedResults.length,
+        status: results.status,
+      });
+    } catch (error) {
+      logger.error('Places search failed:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Places search failed',
+      });
+    }
+  }
+);
+
+// Search places endpoint (GET version)
 router.get('/search',
   [
     query('query').notEmpty().withMessage('Search query is required'),

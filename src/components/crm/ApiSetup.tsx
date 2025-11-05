@@ -1,91 +1,71 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { CheckCircle, AlertCircle, ExternalLink, Copy, Eye, EyeOff, Server, Phone } from 'lucide-react';
-import { useState } from 'react';
+import { CheckCircle, AlertCircle, ExternalLink, Server, Phone } from 'lucide-react';
 import { BackendGuide } from './BackendGuide';
 import { TelnyxSetupGuide } from './TelnyxSetupGuide';
+import { SmartApiKeyInput } from './SmartApiKeyInput';
+import { useApiKeys } from '../../hooks/useApiKeys';
+import { toast } from 'sonner';
 
 export function ApiSetup() {
-  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
-  const [apiKeys, setApiKeys] = useState(() => {
-    // Load from localStorage on mount
-    const saved = localStorage.getItem('crm_api_keys');
-    return saved ? JSON.parse(saved) : {
-      googlePlaces: '',
-      hunter: '',
-      apollo: '',
-      clearbit: '',
-      telnyx: '',
-    };
-  });
-
-  const toggleShowKey = (key: string) => {
-    setShowKeys({ ...showKeys, [key]: !showKeys[key] });
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-
-  const saveApiKey = (key: string, value: string) => {
-    const updated = { ...apiKeys, [key]: value };
-    setApiKeys(updated);
-    localStorage.setItem('crm_api_keys', JSON.stringify(updated));
-  };
+  const { config, hasApiKey } = useApiKeys();
 
   const apis = [
     {
       name: 'Google Places API',
-      key: 'googlePlaces',
-      status: apiKeys.googlePlaces ? 'connected' : 'not-connected',
+      key: 'googlePlaces' as const,
+      status: hasApiKey('googlePlaces') ? 'connected' : 'not-connected',
       description: 'Find businesses, get phone numbers, addresses, and websites',
       pricing: '$17 per 1,000 requests',
       setupUrl: 'https://developers.google.com/maps/documentation/places/web-service/get-api-key',
       required: true,
+      placeholder: 'AIza...',
       features: ['Business search', 'Phone numbers', 'Addresses', 'Websites', 'Reviews & ratings'],
     },
     {
       name: 'Telnyx',
-      key: 'telnyx',
-      status: apiKeys.telnyx ? 'connected' : 'not-connected',
+      key: 'telnyx' as const,
+      status: hasApiKey('telnyx') ? 'connected' : 'not-connected',
       description: 'Voice calling, SMS, and telephony services',
       pricing: '$0.004/min for calls, $0.004/SMS',
       setupUrl: 'https://developers.telnyx.com/docs/v2/messaging',
       required: true,
+      placeholder: 'KEY01...',
       features: ['Voice calls', 'SMS messaging', 'Call recording', 'WebRTC', 'Voicemail'],
     },
     {
       name: 'Hunter.io',
-      key: 'hunter',
-      status: apiKeys.hunter ? 'connected' : 'not-connected',
+      key: 'hunter' as const,
+      status: hasApiKey('hunter') ? 'connected' : 'not-connected',
       description: 'Find and verify professional email addresses',
       pricing: 'Free tier: 25 searches/mo, Paid: $49/mo for 500 searches',
       setupUrl: 'https://hunter.io/api',
       required: false,
+      placeholder: 'Enter Hunter.io API key...',
       features: ['Email finder', 'Email verification', 'Domain search', 'Bulk searches'],
     },
     {
       name: 'Apollo.io',
-      key: 'apollo',
-      status: apiKeys.apollo ? 'connected' : 'not-connected',
+      key: 'apollo' as const,
+      status: hasApiKey('apollo') ? 'connected' : 'not-connected',
       description: 'B2B contact database and enrichment',
       pricing: 'Free tier: 50 emails/mo, Paid: $49/mo',
       setupUrl: 'https://apolloio.github.io/apollo-api-docs/',
       required: false,
+      placeholder: 'Enter Apollo.io API key...',
       features: ['Contact enrichment', 'Company data', 'Job titles', 'LinkedIn profiles'],
     },
     {
       name: 'Clearbit',
-      key: 'clearbit',
-      status: apiKeys.clearbit ? 'connected' : 'not-connected',
+      key: 'clearbit' as const,
+      status: hasApiKey('clearbit') ? 'connected' : 'not-connected',
       description: 'Company data enrichment (employee count, revenue, tech stack)',
       pricing: '$99/mo',
       setupUrl: 'https://clearbit.com/docs',
       required: false,
+      placeholder: 'sk_...',
       features: ['Company enrichment', 'Employee count', 'Revenue estimates', 'Tech stack'],
     },
   ];
@@ -178,60 +158,27 @@ export function ApiSetup() {
             {apis.map((api) => (
               <Card key={api.key} className="card-responsive border border-gray-200">
                 <CardContent className="card-content-responsive">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h4 className="mb-1">{api.name}</h4>
-                      <p className="text-sm text-gray-500">{api.description}</p>
-                    </div>
-                    {apiKeys[api.key as keyof typeof apiKeys] ? (
-                      <Badge className="bg-green-100 text-green-800 border-0">Connected</Badge>
-                    ) : (
-                      <Badge variant="outline">Not Connected</Badge>
-                    )}
-                  </div>
+                  <SmartApiKeyInput
+                    service={api.key}
+                    label={api.name}
+                    description={api.description}
+                    placeholder={api.placeholder}
+                    onSaveSuccess={(resources) => {
+                      toast.success(`${api.name} connected successfully!`);
+                      if (resources && Object.keys(resources).length > 0) {
+                        console.log('Discovered resources:', resources);
+                      }
+                    }}
+                  />
                   
-                  <div className="space-y-3">
-                    <div className="form-group">
-                      <Label className="text-sm font-medium">API Key</Label>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <div className="relative flex-1">
-                          <Input
-                            type={showKeys[api.key] ? 'text' : 'password'}
-                            placeholder="Enter your API key..."
-                            value={apiKeys[api.key as keyof typeof apiKeys]}
-                            onChange={(e) => setApiKeys({ ...apiKeys, [api.key]: e.target.value })}
-                            className="pr-10 text-sm"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
-                            onClick={() => toggleShowKey(api.key)}
-                            type="button"
-                          >
-                            {showKeys[api.key] ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                        <Button 
-                          variant="outline"
-                          size="default"
-                          className="btn-responsive w-full sm:w-auto min-w-[100px]"
-                          onClick={() => saveApiKey(api.key, apiKeys[api.key as keyof typeof apiKeys])}
-                        >
-                          Save
-                        </Button>
-                      </div>
-                    </div>
+                  <div className="mt-3">
                     <Button
                       variant="link"
                       size="sm"
                       className="p-0 h-auto text-blue-600"
                       onClick={() => window.open(api.setupUrl, '_blank')}
                     >
+                      <ExternalLink className="h-3 w-3 mr-1" />
                       How to get {api.name} API key →
                     </Button>
                   </div>

@@ -33,6 +33,7 @@ import {
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { TelnyxQuickAdd } from './TelnyxQuickAdd';
+import { ApiKeyManager } from '../../services/apiKeyManager';
 
 interface CallLog {
   id: string;
@@ -144,11 +145,10 @@ export function Phone({ onNavigate }: PhoneProps) {
 
   // Check for missing configuration on mount
   useEffect(() => {
-    const telnyxConfig = localStorage.getItem('telnyx_config');
-    const config = telnyxConfig ? JSON.parse(telnyxConfig) : null;
-    const phoneNumber = localStorage.getItem('telnyx_phone_number');
+    const telnyxConfig = ApiKeyManager.getServiceConfig('telnyx') as any;
+    const phoneNumber = telnyxConfig?.phoneNumbers?.[0]?.phoneNumber || localStorage.getItem('telnyx_phone_number');
 
-    if (!config || !config.connectionId) {
+    if (!telnyxConfig || !telnyxConfig.connectionId) {
       setTimeout(() => {
         toast.warning('Telnyx Connection ID Required', {
           description: '⚙️ Go to Settings → Telnyx PBX to configure your Connection ID to make calls',
@@ -179,11 +179,8 @@ export function Phone({ onNavigate }: PhoneProps) {
       return;
     }
 
-    // Check if Telnyx is configured
-    const savedKeys = localStorage.getItem('crm_api_keys');
-    const apiKeys = savedKeys ? JSON.parse(savedKeys) : {};
-    
-    if (!apiKeys.telnyx) {
+    // Check if Telnyx is configured using ApiKeyManager
+    if (!ApiKeyManager.hasApiKey('telnyx')) {
       toast.error('Telnyx not configured', {
         description: 'Please add your Telnyx credentials in Settings → API Setup',
         duration: 5000,
@@ -415,6 +412,14 @@ export function Phone({ onNavigate }: PhoneProps) {
           <p className="text-gray-500">Make calls, send SMS, and manage communications</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onNavigate && onNavigate('phone-system')}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
           {telnyxPhoneNumber && (
             <Badge variant="outline" className="border-blue-300 text-blue-600">
               <PhoneIcon className="h-3 w-3 mr-1" />

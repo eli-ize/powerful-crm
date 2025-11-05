@@ -11,7 +11,7 @@ import type {
   CallParams,
 } from '../types/api.types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
 
 class ApiClient {
   private baseURL: string;
@@ -202,6 +202,32 @@ class ApiClient {
   // Health check
   async healthCheck(): Promise<ApiResponse<{ status: string; timestamp: string }>> {
     return this.request<{ status: string; timestamp: string }>('/api/health');
+  }
+
+  // Generic GET request
+  async get<T = any>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: 'GET' });
+  }
+
+  // Generic POST request
+  async post<T = any>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  // Generic PUT request
+  async put<T = any>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  // Generic DELETE request
+  async delete<T = any>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: 'DELETE' });
   }
 
   // Set auth token (for when user is already logged in)

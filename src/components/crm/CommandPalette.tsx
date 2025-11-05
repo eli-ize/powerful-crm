@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Search, Calendar, Users, TrendingUp, Mail, Settings, Plus, FileText, Phone } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Command {
   id: string;
@@ -14,20 +15,29 @@ interface Command {
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigate: (view: string) => void;
+  onNavigate?: (view: string) => void;
 }
 
 export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPaletteProps) {
   const [search, setSearch] = useState('');
+  const navigate = useNavigate();
+
+  const handleNavigate = (view: string) => {
+    if (onNavigate) {
+      onNavigate(view);
+    } else {
+      navigate(`/${view}`);
+    }
+  };
 
   const commands: Command[] = [
-    { id: '1', label: 'Go to Dashboard', icon: TrendingUp, category: 'Navigation', action: () => onNavigate('dashboard') },
-    { id: '2', label: 'Go to Contacts', icon: Users, category: 'Navigation', action: () => onNavigate('contacts') },
-    { id: '3', label: 'Go to Deals', icon: TrendingUp, category: 'Navigation', action: () => onNavigate('deals') },
-    { id: '4', label: 'Go to Activities', icon: Calendar, category: 'Navigation', action: () => onNavigate('activities') },
-    { id: '5', label: 'Go to Email', icon: Mail, category: 'Navigation', action: () => onNavigate('email') },
-    { id: '6', label: 'Go to Phone & SMS', icon: Phone, category: 'Navigation', action: () => onNavigate('phone') },
-    { id: '7', label: 'Go to Lead Finder', icon: Search, category: 'Navigation', action: () => onNavigate('leadfinder') },
+    { id: '1', label: 'Go to Dashboard', icon: TrendingUp, category: 'Navigation', action: () => handleNavigate('dashboard') },
+    { id: '2', label: 'Go to Contacts', icon: Users, category: 'Navigation', action: () => handleNavigate('contacts') },
+    { id: '3', label: 'Go to Deals', icon: TrendingUp, category: 'Navigation', action: () => handleNavigate('deals') },
+    { id: '4', label: 'Go to Activities', icon: Calendar, category: 'Navigation', action: () => handleNavigate('activities') },
+    { id: '5', label: 'Go to Email', icon: Mail, category: 'Navigation', action: () => handleNavigate('email') },
+    { id: '6', label: 'Go to Phone & SMS', icon: Phone, category: 'Navigation', action: () => handleNavigate('phone') },
+    { id: '7', label: 'Go to Lead Finder', icon: Search, category: 'Navigation', action: () => handleNavigate('leadfinder') },
     { id: '8', label: 'Create New Contact', icon: Plus, category: 'Actions', action: () => {} },
     { id: '9', label: 'Create New Deal', icon: Plus, category: 'Actions', action: () => {} },
     { id: '10', label: 'Create New Task', icon: Plus, category: 'Actions', action: () => {} },

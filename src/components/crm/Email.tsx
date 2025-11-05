@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Mail, Send, Inbox, Clock, Star, Archive, Plus, Paperclip, Eye } from 'lucide-react';
+import { Mail, Send, Inbox, Clock, Star, Archive, Plus, Paperclip, Eye, Loader2, Users, CheckCircle, AlertCircle } from 'lucide-react';
 import { Avatar, AvatarFallback } from '../ui/avatar';
+import { toast } from 'sonner';
+import { api } from '../../utils/api';
 
 interface EmailMessage {
   id: string;
@@ -22,6 +24,14 @@ interface EmailMessage {
   starred: boolean;
   contact?: string;
   deal?: string;
+}
+
+interface Contact {
+  id?: string;
+  name: string;
+  email: string;
+  company?: string;
+  phone?: string;
 }
 
 const mockInbox: EmailMessage[] = [
@@ -41,23 +51,171 @@ export function Email() {
   const [sent, setSent] = useState<EmailMessage[]>(mockSent);
   const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
-  const [newEmail, setNewEmail] = useState({ to: '', subject: '', body: '', contact: '' });
+  const [newEmail, setNewEmail] = useState({ to: '', subject: '', body: '', contact: '', isHtml: true });
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const [emailType, setEmailType] = useState<'individual' | 'bulk' | 'template'>('individual');
+  const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
+  const [bulkEmail, setBulkEmail] = useState({ subject: '', content: '', contacts: [] as Contact[] });
 
-  const handleSendEmail = () => {
-    const email: EmailMessage = {
-      id: Date.now().toString(),
-      from: 'me@powercrm.com',
-      to: newEmail.to,
-      subject: newEmail.subject,
-      body: newEmail.body,
-      date: new Date().toISOString().slice(0, 16).replace('T', ' '),
-      read: true,
-      starred: false,
-      contact: newEmail.contact,
-    };
-    setSent([email, ...sent]);
-    setNewEmail({ to: '', subject: '', body: '', contact: '' });
-    setIsComposeOpen(false);
+  // Load contacts on component mount
+  useEffect(() => {
+    loadContacts();
+  }, []);
+
+  const loadContacts = async () => {
+    try {
+      const response = await api.request('/api/contacts');
+      if (response.data) {
+        const mappedContacts = response.data.map((contact: any) => ({
+          id: contact.id,
+          name: `${contact.firstName} ${contact.lastName}`.trim(),
+          email: contact.email || `${contact.firstName?.toLowerCase()}.${contact.lastName?.toLowerCase()}@example.com`,
+          company: contact.company,
+          phone: contact.phone,
+        }));
+        setContacts(mappedContacts);
+      }
+    } catch (error) {
+      console.error('Failed to load contacts:', error);
+    }
+  };
+
+  const emailTemplates = [
+    { value: 'welcome', label: 'Welcome Email', content: 'Welcome to our platform! We\'re excited to have you on board.' },
+    { value: 'followup', label: 'Follow-up Email', content: 'Thank you for your interest. We wanted to follow up on our previous conversation.' },
+    { value: 'newsletter', label: 'Newsletter Template', content: 'Here are the latest updates and news from our team.' },
+    { value: 'reminder', label: 'Meeting Reminder', content: 'This is a friendly reminder about our upcoming meeting.' },
+  ];
+
+  const handleSendEmail = async () => {
+    if (!newEmail.to || !newEmail.subject || !newEmail.body) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const response = await api.request('/api/emails/send', {
+        method: 'POST',
+        body: JSON.stringify({
+          to: newEmail.to,
+          subject: newEmail.subject,
+          content: newEmail.body,
+          isHtml: newEmail.isHtml,
+        }),
+      });
+
+      if (response.success) {
+        toast.success('✅ Email sent successfully!');
+        
+        // Add to sent emails
+        const email: EmailMessage = {
+          id: Date.now().toString(),
+          from: 'me@powercrm.com',
+          to: newEmail.to,
+          subject: newEmail.subject,
+          body: newEmail.body,
+          date: new Date().toISOString().slice(0, 16).replace('T', ' '),
+          read: true,
+          starred: false,
+          contact: newEmail.contact,
+        };
+        setSent([email, ...sent]);
+        
+        setNewEmail({ to: '', subject: '', body: '', contact: '', isHtml: true });
+        setIsComposeOpen(false);
+      } else {
+        throw new Error(response.error || 'Failed to send email');
+      }
+    } catch (error) {
+      toast.error('Failed to send email', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const sendBulkEmail = async () => {
+    if (!bulkEmail.subject || !bulkEmail.content || bulkEmail.contacts.length === 0) {
+      toast.error('Please fill in all required fields and select contacts');
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const response = await api.request('/api/emails/bulk', {
+        method: 'POST',
+        body: JSON.stringify({
+          contacts: bulkEmail.contacts,
+          subject: bulkEmail.subject,
+          content: bulkEmail.content,
+        }),
+      });
+
+      if (response.success) {
+        toast.success(`🎉 Bulk email campaign completed!`, {
+          description: `Sent to ${response.data.sent} contacts, ${response.data.failed} failed`,
+        });
+        setBulkEmail({ subject: '', content: '', contacts: [] });
+        setIsComposeOpen(false);
+      } else {
+        throw new Error(response.error || 'Failed to send bulk email');
+      }
+    } catch (error) {
+      toast.error('Failed to send bulk email', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const sendWelcomeEmail = async (contact: Contact) => {
+    setIsSending(true);
+    try {
+      const response = await api.request('/api/emails/welcome', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: contact.name,
+          email: contact.email,
+          company: contact.company,
+          phone: contact.phone,
+        }),
+      });
+
+      if (response.success) {
+        toast.success(`✅ Welcome email sent to ${contact.name}!`);
+      } else {
+        throw new Error(response.error || 'Failed to send welcome email');
+      }
+    } catch (error) {
+      toast.error('Failed to send welcome email', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const loadTemplate = (templateValue: string) => {
+    const template = emailTemplates.find(t => t.value === templateValue);
+    if (template) {
+      if (emailType === 'individual') {
+        setNewEmail(prev => ({
+          ...prev,
+          subject: template.label,
+          body: template.content,
+        }));
+      } else if (emailType === 'bulk') {
+        setBulkEmail(prev => ({
+          ...prev,
+          subject: template.label,
+          content: template.content,
+        }));
+      }
+    }
   };
 
   const toggleStar = (id: string, type: 'inbox' | 'sent') => {
@@ -94,60 +252,215 @@ export function Email() {
               <span className="sm:hidden">Compose</span>
             </Button>
           </DialogTrigger>
-          <DialogContent className="dialog-responsive max-w-2xl">
+          <DialogContent className="dialog-responsive max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Compose Email</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-4">
+              {/* Email Type Selection */}
               <div className="form-group">
-                <Label>To *</Label>
-                <Input
-                  placeholder="recipient@example.com"
-                  value={newEmail.to}
-                  onChange={(e) => setNewEmail({ ...newEmail, to: e.target.value })}
-                />
-              </div>
-              <div className="form-group">
-                <Label>Link to Contact</Label>
-                <Select value={newEmail.contact} onValueChange={(value: string) => setNewEmail({ ...newEmail, contact: value })}>
+                <Label>Email Type</Label>
+                <Select value={emailType} onValueChange={setEmailType}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select contact" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Sarah Johnson">Sarah Johnson</SelectItem>
-                    <SelectItem value="Michael Chen">Michael Chen</SelectItem>
-                    <SelectItem value="Emily Davis">Emily Davis</SelectItem>
-                    <SelectItem value="James Wilson">James Wilson</SelectItem>
+                    <SelectItem value="individual">Individual Email</SelectItem>
+                    <SelectItem value="bulk">Bulk Email Campaign</SelectItem>
+                    <SelectItem value="template">Use Template</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="form-group">
-                <Label>Subject *</Label>
-                <Input
-                  placeholder="Email subject"
-                  value={newEmail.subject}
-                  onChange={(e) => setNewEmail({ ...newEmail, subject: e.target.value })}
-                />
-              </div>
-              <div className="form-group">
-                <Label>Message *</Label>
-                <Textarea
-                  placeholder="Write your email..."
-                  className="min-h-[200px]"
-                  value={newEmail.body}
-                  onChange={(e) => setNewEmail({ ...newEmail, body: e.target.value })}
-                />
-              </div>
+
+              {/* Template Selection */}
+              {emailType === 'template' && (
+                <div className="form-group">
+                  <Label>Select Template</Label>
+                  <Select onValueChange={loadTemplate}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a template..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {emailTemplates.map(template => (
+                        <SelectItem key={template.value} value={template.value}>
+                          {template.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Bulk Email Warning */}
+              {emailType === 'bulk' && (
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <Users className="h-4 w-4 inline mr-1" />
+                    {selectedContacts.length} contacts will receive this email
+                  </p>
+                </div>
+              )}
+
+              {/* Individual Email Form */}
+              {(emailType === 'individual' || emailType === 'template') && (
+                <>
+                  <div className="form-group">
+                    <Label>To *</Label>
+                    <Input
+                      placeholder="recipient@example.com"
+                      value={newEmail.to}
+                      onChange={(e) => setNewEmail({ ...newEmail, to: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <Label>Link to Contact</Label>
+                    <Select value={newEmail.contact} onValueChange={(value: string) => setNewEmail({ ...newEmail, contact: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select contact" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contacts.map(contact => (
+                          <SelectItem key={contact.id || contact.email} value={contact.name}>
+                            {contact.name} ({contact.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="form-group">
+                    <Label>Subject *</Label>
+                    <Input
+                      placeholder="Email subject"
+                      value={newEmail.subject}
+                      onChange={(e) => setNewEmail({ ...newEmail, subject: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <Label>Message *</Label>
+                    <Textarea
+                      placeholder="Write your email..."
+                      className="min-h-[200px]"
+                      value={newEmail.body}
+                      onChange={(e) => setNewEmail({ ...newEmail, body: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Bulk Email Form */}
+              {emailType === 'bulk' && (
+                <>
+                  <div className="form-group">
+                    <Label>Select Contacts *</Label>
+                    <div className="max-h-32 overflow-y-auto border rounded p-2">
+                      {contacts.map(contact => (
+                        <label key={contact.id || contact.email} className="flex items-center gap-2 p-1">
+                          <input
+                            type="checkbox"
+                            checked={selectedContacts.some(c => c.email === contact.email)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedContacts(prev => [...prev, contact]);
+                                setBulkEmail(prev => ({ ...prev, contacts: [...prev.contacts, contact] }));
+                              } else {
+                                setSelectedContacts(prev => prev.filter(c => c.email !== contact.email));
+                                setBulkEmail(prev => ({ ...prev, contacts: prev.contacts.filter(c => c.email !== contact.email) }));
+                              }
+                            }}
+                          />
+                          <span className="text-sm">{contact.name} ({contact.email})</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <Label>Subject *</Label>
+                    <Input
+                      placeholder="Campaign subject"
+                      value={bulkEmail.subject}
+                      onChange={(e) => setBulkEmail(prev => ({ ...prev, subject: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <Label>Message *</Label>
+                    <Textarea
+                      placeholder="Your campaign content... (Use {{name}} and {{company}} for personalization)"
+                      className="min-h-[200px]"
+                      value={bulkEmail.content}
+                      onChange={(e) => setBulkEmail(prev => ({ ...prev, content: e.target.value }))}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Tip: Use {"{{name}}"} and {"{{company}}"} for personalization
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Action Buttons */}
               <div className="flex gap-2">
-                <Button onClick={handleSendEmail} className="flex-1 btn-responsive">
-                  <Send className="mr-2 h-4 w-4" />
-                  <span>Send Email</span>
-                </Button>
+                {emailType === 'bulk' ? (
+                  <Button 
+                    onClick={sendBulkEmail} 
+                    disabled={isSending || selectedContacts.length === 0}
+                    className="flex-1 btn-responsive"
+                  >
+                    {isSending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending Campaign...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Send to {selectedContacts.length} Contacts
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={handleSendEmail} 
+                    disabled={isSending}
+                    className="flex-1 btn-responsive"
+                  >
+                    {isSending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Send Email
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button variant="outline" className="btn-responsive">
                   <Paperclip className="mr-2 h-4 w-4" />
                   <span className="hidden sm:inline">Attach</span>
                 </Button>
               </div>
+
+              {/* Quick Welcome Emails for Selected Contacts */}
+              {selectedContacts.length > 0 && (
+                <div className="border-t pt-4">
+                  <Label className="text-sm font-medium">Quick Actions</Label>
+                  <div className="flex gap-2 flex-wrap mt-2">
+                    {selectedContacts.slice(0, 3).map(contact => (
+                      <Button
+                        key={contact.email}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => sendWelcomeEmail(contact)}
+                        disabled={isSending}
+                      >
+                        <Mail className="h-3 w-3 mr-1" />
+                        Welcome {contact.name.split(' ')[0]}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>

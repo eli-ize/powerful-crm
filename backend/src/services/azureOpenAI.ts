@@ -30,6 +30,11 @@ export interface ChatCompletionResponse {
   model: string;
 }
 
+export interface StreamChunk {
+  content: string;
+  done: boolean;
+}
+
 export interface ConversationContext {
   campaignId: string;
   contactId: string;
@@ -46,15 +51,10 @@ export class AzureOpenAIService {
     if (config.azureOpenAIKey && config.azureOpenAIEndpoint) {
       this.client = new OpenAI({
         apiKey: config.azureOpenAIKey,
-        baseURL: `${config.azureOpenAIEndpoint}/openai/deployments/${config.azureOpenAIDeployment || 'gpt-4'}`,
-        defaultQuery: { 'api-version': config.azureOpenAIApiVersion || '2024-02-15-preview' },
-        defaultHeaders: {
-          'api-key': config.azureOpenAIKey,
-        },
+        baseURL: config.azureOpenAIEndpoint,
       });
-      logger.info('Azure OpenAI Service initialized');
+      logger.info('Azure AI Foundry Service initialized (Phi-4-mini-instruct, Johannesburg)');
     } else if (config.openaiApiKey) {
-      // Fallback to regular OpenAI
       this.client = new OpenAI({
         apiKey: config.openaiApiKey,
       });
@@ -71,14 +71,14 @@ export class AzureOpenAIService {
 
     try {
       const response = await this.client.chat.completions.create({
-        model: request.model || 'gpt-4',
+        model: request.model || config.azureOpenAIDeployment || 'Phi-4-mini-instruct',
         messages: request.messages.map(msg => ({
           role: msg.role,
           content: msg.content,
           ...(msg.name && { name: msg.name }),
         })),
         temperature: request.temperature ?? 0.7,
-        max_tokens: request.maxTokens ?? 1000,
+        max_tokens: request.maxTokens ?? 80,
         top_p: request.topP ?? 1,
         frequency_penalty: request.frequencyPenalty ?? 0,
         presence_penalty: request.presencePenalty ?? 0,
@@ -89,8 +89,6 @@ export class AzureOpenAIService {
       if (!choice) {
         throw new Error('No response generated');
       }
-
-      logger.info(`AI completion generated: ${choice.message.content?.length} characters`);
 
       return {
         content: choice.message.content || '',
@@ -108,13 +106,56 @@ export class AzureOpenAIService {
     }
   }
 
+  async *generateChatCompletionStream(request: ChatCompletionRequest): AsyncGenerator<StreamChunk> {
+    if (!this.client) {
+      throw new Error('OpenAI service not configured');
+    }
+
+    try {
+      const stream = await this.client.chat.completions.create({
+        model: request.model || config.azureOpenAIDeployment || 'Phi-4-mini-instruct',
+        messages: request.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          ...(msg.name && { name: msg.name }),
+        })),
+        temperature: request.temperature ?? 0.6,
+        max_tokens: request.maxTokens ?? 200,  // Increased default for complete responses
+        top_p: request.topP ?? 1,
+        frequency_penalty: request.frequencyPenalty ?? 0,
+        presence_penalty: request.presencePenalty ?? 0,
+        stop: request.stop,
+        stream: true,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          yield {
+            content,
+            done: false,
+          };
+        }
+        
+        if (chunk.choices[0]?.finish_reason) {
+          yield {
+            content: '',
+            done: true,
+          };
+        }
+      }
+    } catch (error) {
+      logger.error('Azure OpenAI streaming failed:', error);
+      throw new Error('Failed to generate streaming AI response');
+    }
+  }
+
   async generateCallResponse(
     context: ConversationContext,
     prospectMessage: string
   ): Promise<{ response: string; nextStage: string; confidence: number }> {
     const systemPrompt = this.buildSystemPrompt(context);
     
-    // Add prospect's message to conversation history
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...context.conversationHistory,
@@ -124,25 +165,22 @@ export class AzureOpenAIService {
     try {
       const completion = await this.generateChatCompletion({
         messages,
-        temperature: 0.8,
-        maxTokens: 200, // Keep responses concise for calls
+        temperature: 0.6,
+        maxTokens: 40,
       });
 
-      // Parse the response to extract next stage and confidence
-      const { response, nextStage, confidence } = this.parseCallResponse(
-        completion.content,
-        context.currentStage
-      );
-
-      logger.info(`Generated call response: stage ${context.currentStage} -> ${nextStage}`);
-
-      return { response, nextStage, confidence };
+      const response = completion.content.trim();
+      
+      return { 
+        response, 
+        nextStage: context.currentStage,
+        confidence: 0.8 
+      };
     } catch (error) {
       logger.error('Failed to generate call response:', error);
       
-      // Fallback response
       return {
-        response: "I appreciate you sharing that with me. Could you tell me more about your current situation?",
+        response: "I see. Could you tell me more about that?",
         nextStage: context.currentStage,
         confidence: 0.5,
       };
@@ -150,62 +188,21 @@ export class AzureOpenAIService {
   }
 
   private buildSystemPrompt(context: ConversationContext): string {
-    const basePrompt = `You are an AI sales agent making a cold call. 
+    return `You are a professional sales agent on a phone call.
 
 PERSONA: ${context.personalityPrompt}
-
 OBJECTIVE: ${context.objective}
 
-CURRENT STAGE: ${context.currentStage}
+RULES:
+- Keep responses under 25 words (1-2 sentences max)
+- Sound natural and conversational
+- Ask one question at a time
+- Be empathetic and listen actively
+- Don't be pushy
 
-CONVERSATION GUIDELINES:
-- Keep responses under 50 words for natural phone conversation
-- Be conversational and human-like
-- Listen actively and ask follow-up questions
-- Handle objections with empathy
-- Don't be pushy or aggressive
-- End each response with [STAGE:stage_name|CONFIDENCE:0.0-1.0]
+STAGE: ${context.currentStage}
 
-STAGE PROGRESSION:
-1. greeting: Introduce yourself and purpose
-2. qualification: Understand their needs and pain points  
-3. pitch: Present your solution based on their needs
-4. objection_handling: Address concerns and doubts
-5. closing: Ask for next steps (meeting, demo, etc.)
-6. follow_up: Schedule future contact
-
-RESPONSE FORMAT:
-Your conversational response here.
-[STAGE:next_stage|CONFIDENCE:0.8]
-
-Remember: You're on a phone call. Be natural, conversational, and concise.`;
-
-    return basePrompt;
-  }
-
-  private parseCallResponse(
-    response: string,
-    currentStage: string
-  ): { response: string; nextStage: string; confidence: number } {
-    // Extract stage and confidence from response
-    const regex = /\[STAGE:(\w+)\|CONFIDENCE:([\d.]+)\]/;
-    const stageMatch = regex.exec(response);
-    
-    let nextStage = currentStage;
-    let confidence = 0.5;
-    let cleanResponse = response;
-
-    if (stageMatch) {
-      nextStage = stageMatch[1];
-      confidence = Number.parseFloat(stageMatch[2]);
-      cleanResponse = response.replace(/\[STAGE:.*?\]/, '').trim();
-    }
-
-    return {
-      response: cleanResponse,
-      nextStage,
-      confidence: Math.max(0, Math.min(1, confidence)),
-    };
+Respond briefly and naturally as if speaking on the phone.`;
   }
 
   async analyzeCallOutcome(
@@ -218,38 +215,35 @@ Remember: You're on a phone call. Be natural, conversational, and concise.`;
     nextAction: string;
     insights: string[];
   }> {
-    const analysisPrompt = `Analyze this sales call conversation and determine the outcome.
+    const analysisPrompt = `Analyze this sales call conversation quickly.
 
-CAMPAIGN OBJECTIVE: ${campaignObjective}
+OBJECTIVE: ${campaignObjective}
 
 CONVERSATION:
-${conversationHistory.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n')}
+${conversationHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
 
-Provide your analysis in this exact JSON format:
+Respond with JSON:
 {
   "outcome": "interested|not_interested|needs_follow_up|no_answer",
   "confidence": 0.85,
-  "summary": "Brief 1-2 sentence summary of the call",
-  "nextAction": "Specific recommended next step",
-  "insights": ["Key insight 1", "Key insight 2", "Key insight 3"]
+  "summary": "Brief summary",
+  "nextAction": "Next step",
+  "insights": ["Insight 1", "Insight 2"]
 }`;
 
     try {
       const completion = await this.generateChatCompletion({
         messages: [{ role: 'user', content: analysisPrompt }],
-        temperature: 0.3, // Low temperature for consistent analysis
-        maxTokens: 500,
+        temperature: 0.3,
+        maxTokens: 300,
       });
 
       const analysis = JSON.parse(completion.content);
-      
-      logger.info(`Call analysis completed: ${analysis.outcome} (${analysis.confidence})`);
       
       return analysis;
     } catch (error) {
       logger.error('Failed to analyze call outcome:', error);
       
-      // Fallback analysis
       return {
         outcome: 'needs_follow_up',
         confidence: 0.5,
@@ -265,66 +259,54 @@ Provide your analysis in this exact JSON format:
     prospectName: string,
     campaignObjective: string
   ): Promise<{ subject: string; body: string }> {
-    const emailPrompt = `Generate a follow-up email based on this sales call.
+    const emailPrompt = `Create a brief follow-up email.
 
-PROSPECT NAME: ${prospectName}
-CAMPAIGN OBJECTIVE: ${campaignObjective}
-CALL SUMMARY: ${conversationSummary}
+PROSPECT: ${prospectName}
+OBJECTIVE: ${campaignObjective}
+SUMMARY: ${conversationSummary}
 
-Create a professional, personalized follow-up email with:
-- Compelling subject line
-- Reference to the conversation
-- Clear value proposition
-- Specific next step
-- Professional but friendly tone
-
-Format your response as JSON:
+JSON format:
 {
-  "subject": "Subject line here",
-  "body": "Email body here with proper formatting"
+  "subject": "Subject line",
+  "body": "Brief email body"
 }`;
 
     try {
       const completion = await this.generateChatCompletion({
         messages: [{ role: 'user', content: emailPrompt }],
         temperature: 0.7,
-        maxTokens: 800,
+        maxTokens: 400,
       });
 
       const email = JSON.parse(completion.content);
-      
-      logger.info(`Follow-up email generated for ${prospectName}`);
       
       return email;
     } catch (error) {
       logger.error('Failed to generate follow-up email:', error);
       
-      // Fallback email
       return {
         subject: `Following up on our conversation`,
-        body: `Hi ${prospectName},\n\nThank you for taking the time to speak with me today. I wanted to follow up on our discussion about ${campaignObjective}.\n\nBased on our conversation, I believe we can help you achieve your goals. Would you be available for a brief call this week to discuss next steps?\n\nBest regards,\nYour AI Sales Agent`,
+        body: `Hi ${prospectName},\n\nThank you for your time today. Based on our discussion about ${campaignObjective}, I believe we can help.\n\nWould you be available for a brief call this week?\n\nBest regards`,
       };
     }
   }
 
   estimateTokenUsage(text: string): number {
-    // Rough estimation: ~4 characters per token for English text
     return Math.ceil(text.length / 4);
   }
 
-  estimateCost(promptTokens: number, completionTokens: number, model: string = 'gpt-4'): number {
-    // Azure OpenAI pricing (as of 2024)
+  estimateCost(promptTokens: number, completionTokens: number, model: string = 'Phi-4-mini-instruct'): number {
     const pricing: { [key: string]: { input: number; output: number } } = {
-      'gpt-4': { input: 0.03, output: 0.06 }, // per 1K tokens
-      'gpt-4-turbo': { input: 0.01, output: 0.03 },
-      'gpt-3.5-turbo': { input: 0.0015, output: 0.002 },
+      'Phi-4-mini-instruct': { input: 0.001, output: 0.002 },
+      'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
+      'gpt-4': { input: 0.03, output: 0.06 },
     };
 
-    const modelPricing = pricing[model] || pricing['gpt-4'];
+    const modelPricing = pricing[model] || pricing['Phi-4-mini-instruct'];
     const inputCost = (promptTokens / 1000) * modelPricing.input;
     const outputCost = (completionTokens / 1000) * modelPricing.output;
     
-    return Math.round((inputCost + outputCost) * 10000) / 10000; // Round to 4 decimal places
+    return Math.round((inputCost + outputCost) * 10000) / 10000;
   }
 }
 

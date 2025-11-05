@@ -12,6 +12,11 @@ backend/dist/
 .env.local
 .env.*.local
 backend/.env
+.env*
+!.env.example
+
+# WIL Submission folder (academic work, not part of app)
+EliIze_ST10129307_WIL_SUBMISSION/
 
 # Logs
 *.log

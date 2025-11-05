@@ -27,7 +27,7 @@ interface SMSRequest {
 }
 
 class TelnyxService {
-  private client: any;
+  private readonly client: any;
   
   constructor() {
     if (config.telnyxApiKey) {
@@ -52,11 +52,15 @@ class TelnyxService {
         throw new Error('Connection ID is required. Please configure your Telnyx connection ID in the settings.');
       }
       
+      // Use ngrok webhook URL or fallback to backend URL
+      // For local development with ngrok, webhook_url should be configured via WEBHOOK_URL env var
+      const webhookUrl = params.webhook_url || config.webhookUrl || `${config.backendUrl}/api/telnyx/webhook`;
+      
       const callParams = {
         to: params.to,
         from: params.from,
         connection_id: params.connectionId,
-        webhook_url: params.webhook_url || `${config.backendUrl}/api/calls/webhook`,
+        webhook_url: webhookUrl,
         webhook_failover_url: params.webhook_failover_url,
         time_limit_secs: params.time_limit_secs || 1800, // 30 minutes
         record: 'record-from-answer',
@@ -64,7 +68,13 @@ class TelnyxService {
         record_channels: 'dual',
       };
 
-      logger.info('Call parameters:', JSON.stringify(callParams, null, 2));
+      logger.info('=== CALL PARAMS ===');
+      logger.info(`To: ${callParams.to}`);
+      logger.info(`From: ${callParams.from}`);
+      logger.info(`Connection ID: ${callParams.connection_id}`);
+      logger.info(`Webhook URL: ${callParams.webhook_url}`);
+      logger.info('===================');
+      
       const response = await this.client.calls.create(callParams);
       
       logger.info(`Call initiated successfully: ${response.data.call_control_id}`);
@@ -76,20 +86,21 @@ class TelnyxService {
         is_alive: response.data.is_alive,
       };
     } catch (error: any) {
-      logger.error('Failed to initiate call:', {
-        error: error.message,
-        code: error.code,
-        type: error.type,
-        detail: error.detail,
-        raw: error.raw,
-        statusCode: error.statusCode,
-      });
+      logger.error('=== TELNYX API ERROR ===');
+      logger.error(`Message: ${error.message}`);
+      logger.error(`Status Code: ${error.statusCode}`);
+      logger.error(`Code: ${error.code}`);
+      logger.error(`Type: ${error.type}`);
+      logger.error(`Detail: ${error.detail}`);
+      logger.error(`Raw Response: ${JSON.stringify(error.raw)}`);
+      logger.error('========================');
       
       // Provide more specific error messages
       if (error.statusCode === 401 || error.statusCode === 403) {
         throw new Error('Invalid Telnyx API key or insufficient permissions');
       } else if (error.statusCode === 422) {
-        throw new Error(`Invalid call parameters: ${error.message || 'Check your phone numbers and connection ID'}`);
+        const details = error.detail || error.message || 'Check your phone numbers and connection ID';
+        throw new Error(`Invalid call parameters: ${details}`);
       } else if (error.message) {
         throw new Error(error.message);
       }
@@ -299,7 +310,7 @@ class TelnyxService {
   // Utility method to format phone number
   static formatPhoneNumber(phone: string): string {
     // Remove all non-digits
-    const cleaned = phone.replace(/\D/g, '');
+    const cleaned = phone.replaceAll(/\D/g, '');
     
     // Add country code if missing (assume US +1)
     if (cleaned.length === 10) {

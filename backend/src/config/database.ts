@@ -16,9 +16,10 @@ if (config.nodeEnv === 'development') {
   globalThis.__prisma = prisma;
 }
 
-// Handle graceful shutdown
-process.on('beforeExit', async () => {
-  await prisma.$disconnect();
-});
+// Graceful shutdown handled in server.ts SIGTERM handler
+// Don't disconnect on beforeExit as it causes premature exits
+// process.on('beforeExit', async () => {
+//   await prisma.$disconnect();
+// });
 
 export default prisma;
