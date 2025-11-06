@@ -50,13 +50,17 @@ Development and management scripts for Powerful CRM.
 ## 📝 Script Details
 
 ### start-servers.ps1
-Starts both frontend (port 5173) and backend (port 3001) in separate terminals.
+Starts both frontend (port 5173) and backend (port 8000) in separate terminals.
 
 **Features:**
 - Checks for existing processes
 - Validates environment setup
 - Shows startup status
-- Opens browser automatically
+- Opens browser automatically (http://localhost:5173)
+
+**Login Credentials:**
+- Email: test@powerfulcrm.com
+- Password: test123
 
 ### restart-servers.ps1
 Gracefully stops and restarts all servers.
@@ -65,6 +69,7 @@ Gracefully stops and restarts all servers.
 - After code changes
 - After dependency updates
 - After environment variable changes
+- After database schema updates
 
 ### keep-servers-alive.ps1
 Background monitoring script that automatically restarts crashed servers.
@@ -79,10 +84,10 @@ Background monitoring script that automatically restarts crashed servers.
 Quick health check for all services.
 
 **Checks:**
-- Frontend (port 5173)
-- Backend (port 3001)
-- Database connection
-- API endpoints
+- Frontend (port 5173) - React + Vite
+- Backend (port 8000) - Node.js + Express
+- Database connection (SQLite or PostgreSQL)
+- API health endpoints
 
 ---
 
@@ -102,4 +107,5 @@ Quick health check for all services.
 
 ---
 
-**Last Updated:** October 26, 2025
+**Last Updated:** January 2025  
+**Developed By:** Eli Ize (ST10129307)

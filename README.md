@@ -83,10 +83,13 @@ powerful-crm/
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+ and npm
-- PostgreSQL database
-- Azure OpenAI API key (optional for AI features)
-- Google Places API key (optional for lead generation)
+- **Node.js 18+** and npm
+- **Database:** SQLite (development) or PostgreSQL (production)
+- **Optional API Keys:**
+  - Azure OpenAI (Phi-4) - AI chat functionality
+  - Azure Speech Services - Voice features
+  - Google Places API - Lead generation
+  - Telnyx API - Phone system integration
 
 ### Installation
 
@@ -111,29 +114,51 @@ powerful-crm/
    # Copy example environment file
    cp backend/.env.example backend/.env
    
-   # Edit backend/.env with your configuration:
-   # - DATABASE_URL (PostgreSQL connection)
-   # - JWT_SECRET (for authentication)
-   # - AZURE_OPENAI_* (for AI features)
+   # Required settings for local development:
+   # - DATABASE_URL="file:./prisma/dev.db" (SQLite - already configured)
+   # - JWT_SECRET (generate: openssl rand -base64 32)
+   # - JWT_REFRESH_SECRET (generate: openssl rand -base64 32)
+   
+   # Optional API keys (for full features):
    # - GOOGLE_PLACES_API_KEY (for lead generation)
+   # - AZURE_OPENAI_KEY (for AI chat)
+   # - AZURE_SPEECH_KEY (for voice features)
+   # - TELNYX_API_KEY (for phone system)
    ```
 
 4. **Setup database**
    ```bash
    cd backend
+   
+   # Generate Prisma Client
    npx prisma generate
+   
+   # Create database schema
    npx prisma db push
+   
+   # Seed test user (optional)
+   npm run seed
    ```
 
 5. **Start development servers**
    ```bash
+   # Option 1: Start both servers with one command (Windows)
+   npm run start
+   
+   # Option 2: Start manually in separate terminals
    # Terminal 1: Backend (http://localhost:8000)
    cd backend
    npm run dev
    
    # Terminal 2: Frontend (http://localhost:5173)
+   cd ..
    npm run dev
    ```
+   
+6. **Access the application**
+   - Open http://localhost:5173 in your browser
+   - Login with: `test@powerfulcrm.com` / `test123`
+   - Backend API: http://localhost:8000/api/health
 
 ### Production Build
 
@@ -148,13 +173,19 @@ npm start
 
 ---
 
-## 🌐 Live Demo
+## 🌐 Live Demo & Test Credentials
 
-**Production URL:** https://powerful-crm.gentlepond-89090d4a.eastus.azurecontainerapps.io
+**Local Development:**
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000
+- API Health Check: http://localhost:8000/api/health
 
-**Test Credentials:**
-- Username: `demo@powerfulcrm.com`
-- Password: `demo123`
+**Default Test User:**
+- Email: `test@powerfulcrm.com`
+- Password: `test123`
+- Role: SALES_REP
+
+**Note:** The default user is seeded automatically. Run `npm run seed` in the backend folder to recreate if needed.
 
 ---
 
@@ -180,6 +211,58 @@ This project demonstrates proficiency in:
 - **10+ API endpoints** providing comprehensive backend functionality
 - **25+ React components** creating modular, reusable UI
 - **4 database tables** with proper relationships and constraints
+
+---
+
+## 🔐 GitHub Secrets Configuration
+
+For CI/CD and deployment, configure the following secrets in your GitHub repository:
+
+**Navigate to:** Repository Settings → Secrets and variables → Actions → New repository secret
+
+### Required Secrets
+
+```bash
+# Database
+DATABASE_URL                    # PostgreSQL connection string for production
+SHADOW_DATABASE_URL            # Shadow database for Prisma migrations
+
+# Authentication
+JWT_SECRET                     # Min 32 characters (openssl rand -base64 32)
+JWT_REFRESH_SECRET            # Min 32 characters (openssl rand -base64 32)
+
+# Azure OpenAI (AI Features)
+AZURE_OPENAI_KEY              # Azure OpenAI API key
+AZURE_OPENAI_ENDPOINT         # e.g., https://your-resource.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT       # Model deployment name (e.g., Phi-4-mini-instruct)
+AZURE_OPENAI_API_VERSION      # e.g., 2024-05-01-preview
+
+# Azure Speech (Voice Features)
+AZURE_SPEECH_KEY              # Azure Speech Service key
+AZURE_SPEECH_REGION           # e.g., southafricanorth
+
+# Google Places (Lead Generation)
+GOOGLE_PLACES_API_KEY         # Google Places API key
+
+# Telnyx (Phone System - Optional)
+TELNYX_API_KEY               # Telnyx API key
+TELNYX_PUBLIC_KEY            # Telnyx public key
+TELNYX_CONNECTION_ID         # Telnyx connection ID
+
+# Email Configuration
+SMTP_HOST                    # e.g., smtp.gmail.com
+SMTP_PORT                    # e.g., 587
+SMTP_USER                    # SMTP username
+SMTP_PASSWORD                # SMTP app password
+EMAIL_FROM                   # Sender email address
+
+# Application URLs
+FRONTEND_URL                 # Production frontend URL
+BACKEND_URL                  # Production backend URL
+CORS_ORIGIN                  # Allowed CORS origins
+```
+
+For detailed setup instructions, see **[GITHUB_SECRETS.md](./GITHUB_SECRETS.md)**
 
 ---
 

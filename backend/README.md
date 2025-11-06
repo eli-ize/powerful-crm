@@ -1,6 +1,10 @@
 # Powerful CRM Backend
 
-## Quick Start
+Node.js + Express + TypeScript backend with Prisma ORM, Azure AI integration, and real-time features.
+
+---
+
+## 🚀 Quick Start
 
 ### 1. Install Dependencies
 ```bash
@@ -10,188 +14,431 @@ npm install
 
 ### 2. Setup Environment
 ```bash
+# Copy example environment file
 cp .env.example .env
-# Edit .env with your configuration
+
+# Generate secure JWT secrets
+openssl rand -base64 32  # Copy to JWT_SECRET
+openssl rand -base64 32  # Copy to JWT_REFRESH_SECRET
+
+# Edit .env with your API keys (optional for full features)
 ```
 
 ### 3. Setup Database
 ```bash
-# Start PostgreSQL (Docker)
-docker run -d \
-  --name postgres-crm \
-  -e POSTGRES_USER=crmuser \
-  -e POSTGRES_PASSWORD=crmpass \
-  -e POSTGRES_DB=powerfulcrm \
-  -p 5432:5432 \
-  postgres:15
+# SQLite (Default - No setup needed)
+# Database file: ./prisma/dev.db
 
-# Generate Prisma client
-npm run db:generate
+# Generate Prisma Client
+npx prisma generate
 
-# Run migrations
-npm run db:migrate
+# Create/update database schema
+npx prisma db push
 
-# Seed database (optional)
-npm run db:seed
+# Seed test user (optional)
+npm run seed
 ```
+
+**Test User Created:**
+- Email: `test@powerfulcrm.com`
+- Password: `test123`
+- Role: `SALES_REP`
 
 ### 4. Start Development Server
 ```bash
 npm run dev
 ```
 
-Server will start on http://localhost:8000
+Server will start on **http://localhost:8000**
 
-## API Endpoints
+**Verify:** Open http://localhost:8000/api/health
+
+---
+
+## 📡 API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login user
-- `POST /api/auth/refresh` - Refresh access token
+- `POST /api/auth/register` - Register new user
 - `POST /api/auth/logout` - Logout user
 
 ### Contacts
 - `GET /api/contacts` - Get all contacts
 - `POST /api/contacts` - Create contact
-- `GET /api/contacts/:id` - Get contact by ID
 - `PUT /api/contacts/:id` - Update contact
 - `DELETE /api/contacts/:id` - Delete contact
 
-### Deals
-- `GET /api/deals` - Get all deals
-- `POST /api/deals` - Create deal
-- `GET /api/deals/:id` - Get deal by ID
-- `PUT /api/deals/:id` - Update deal
-- `DELETE /api/deals/:id` - Delete deal
+### Lead Generation
+- `POST /api/places/search` - Search businesses via Google Places API
 
-### Campaigns
-- `GET /api/campaigns` - Get all campaigns
-- `POST /api/campaigns` - Create campaign
-- `GET /api/campaigns/:id` - Get campaign by ID
-- `PUT /api/campaigns/:id` - Update campaign
-- `DELETE /api/campaigns/:id` - Delete campaign
+### AI Chat
+- `POST /api/ai-chat/start` - Start AI chat session
+- `POST /api/ai-chat/message` - Send message to AI
 
-### Virtual Agents
-- `GET /api/virtual-agents` - Get all virtual agents
-- `POST /api/virtual-agents` - Create virtual agent
-- `GET /api/virtual-agents/:id` - Get virtual agent by ID
-- `PUT /api/virtual-agents/:id` - Update virtual agent
-- `DELETE /api/virtual-agents/:id` - Delete virtual agent
+### Voice & Speech
+- `POST /api/speech/text-to-speech` - Convert text to speech (Azure)
+- `POST /api/speech/speech-to-text` - Convert speech to text (Azure)
 
-### Calls
-- `GET /api/calls` - Get call logs
-- `POST /api/calls` - Initiate call
-- `GET /api/calls/:id` - Get call details
-- `POST /api/calls/:id/webhook` - Telnyx webhook
+### Phone System (Telnyx)
+- `POST /api/calls` - Initiate outbound call
+- `POST /api/telnyx/webhook` - Telnyx webhook handler
+- `GET /api/telnyx/numbers/fetch` - Fetch phone numbers
 
-### Places (Google Places API)
-- `POST /api/places/search` - Search for businesses
+### Autopilot (AI Automation)
+- `GET /api/autopilot/status` - Get autopilot status
+- `GET /api/autopilot/config` - Get configuration
+- `POST /api/autopilot/config` - Update configuration
+- `POST /api/autopilot/start` - Start autopilot
+- `POST /api/autopilot/stop` - Stop autopilot
+- `GET /api/autopilot/tasks` - Get tasks
+- `POST /api/autopilot/tasks/find-leads` - Find leads task
+- `POST /api/autopilot/tasks/analyze-website` - Analyze website
+- `POST /api/autopilot/tasks/make-calls` - Make calls
+- `GET /api/autopilot/analytics` - Get analytics
 
-### Health
+### Health & Monitoring
 - `GET /api/health` - Basic health check
-- `GET /api/health/detailed` - Detailed health check
+- `GET /api/health/db` - Database health check
+- `GET /api/health/detailed` - Detailed system health
 
-## Environment Variables
+---
 
-See `.env.example` for all available configuration options.
+## ⚙️ Environment Variables
 
-### Required
-- `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET` - JWT signing secret (32+ characters)
-- `JWT_REFRESH_SECRET` - JWT refresh token secret
-
-### Optional (for full functionality)
-- `GOOGLE_PLACES_API_KEY` - For lead finding
-- `TELNYX_API_KEY` - For calling/SMS
-- `AZURE_SPEECH_KEY` - For AI calling
-- `OPENAI_API_KEY` - For AI conversations
-
-## Database
-
-The application uses PostgreSQL with Prisma ORM.
-
-### Key Tables
-- `users` - User accounts and permissions
-- `contacts` - Customer/lead information
-- `deals` - Sales opportunities
-- `campaigns` - Marketing/calling campaigns
-- `virtual_agents` - AI agent configurations
-- `call_logs` - Call records and transcripts
-- `activities` - All user activities
-
-### Migrations
+### Required (Minimum Setup)
 ```bash
-# Create new migration
-npx prisma migrate dev --name description
+# Database (SQLite - no setup needed)
+DATABASE_URL="file:./prisma/dev.db"
 
-# Deploy to production
+# JWT Secrets (generate with: openssl rand -base64 32)
+JWT_SECRET=your_super_secure_jwt_secret_at_least_32_characters_long
+JWT_REFRESH_SECRET=your_super_secure_refresh_secret_at_least_32_characters_long
+
+# Server Configuration
+NODE_ENV=development
+PORT=8000
+FRONTEND_URL=http://localhost:5173
+BACKEND_URL=http://localhost:8000
+CORS_ORIGIN=http://localhost:5173
+```
+
+### Optional (For Full Features)
+
+**Google Places API (Lead Generation):**
+```bash
+GOOGLE_PLACES_API_KEY=your_google_places_api_key
+```
+
+**Azure OpenAI (AI Chat):**
+```bash
+AZURE_OPENAI_KEY=your_azure_openai_key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT=Phi-4-mini-instruct
+AZURE_OPENAI_API_VERSION=2024-05-01-preview
+```
+
+**Azure Speech (Voice Features):**
+```bash
+AZURE_SPEECH_KEY=your_azure_speech_key
+AZURE_SPEECH_REGION=southafricanorth
+```
+
+**Telnyx (Phone System):**
+```bash
+TELNYX_API_KEY=your_telnyx_api_key
+TELNYX_CONNECTION_ID=your_connection_id
+```
+
+**Email (SMTP):**
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+EMAIL_FROM=noreply@yourdomain.com
+```
+
+See `.env.example` for complete configuration options.
+
+---
+
+## 🗄️ Database
+
+**Development:** SQLite (file: `./prisma/dev.db`)  
+**Production:** PostgreSQL (recommended)
+
+### Database Schema
+
+**Core Tables:**
+- `User` - User accounts and authentication
+- `Contact` - Customer/lead information with duplicate prevention
+- `Deal` - Sales opportunities and pipeline
+- `Campaign` - Marketing campaigns
+- `CampaignContact` - Campaign-contact relationships
+- `CallLog` - Phone call records and transcripts
+- `Activity` - User activity tracking
+- `Note` - Contact/deal notes
+- `Task` - Task management
+- `EmailTemplate` - Email templates
+- `AutopilotConfig` - AI autopilot configuration
+- `AutopilotTask` - Autopilot tasks
+- `AutopilotWorkflow` - Automation workflows
+- `ApiUsage` - API cost tracking
+- `UserConfig` - User-specific settings
+- `AuditLog` - Audit trail
+
+### Important Features
+- **Unique Constraints:** `placeId` prevents duplicate contacts from Google Places
+- **Indexes:** Optimized queries on `company+phone` and `company+email`
+- **Relationships:** Proper foreign keys with cascade rules
+- **Migrations:** Version-controlled schema changes
+
+### Database Commands
+```bash
+# Generate Prisma Client (after schema changes)
+npx prisma generate
+
+# Push schema to database (dev)
+npx prisma db push
+
+# Create migration (production)
+npx prisma migrate dev --name migration_name
+
+# Deploy migrations (production)
 npx prisma migrate deploy
+
+# Open Prisma Studio (visual database editor)
+npx prisma studio
+
+# Seed test data
+npm run seed
 ```
 
-## Development
+---
 
-### Scripts
-- `npm run dev` - Start development server with hot reload
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm test` - Run tests
-- `npm run lint` - Lint code
-- `npm run db:studio` - Open Prisma Studio
+## 🛠️ Development
 
-### File Structure
-```
-src/
-├── config/         # Configuration and database
-├── controllers/    # Route handlers
-├── middleware/     # Express middleware
-├── routes/         # API routes
-├── services/       # Business logic
-├── types/          # TypeScript types
-├── utils/          # Utility functions
-└── server.ts       # Entry point
-```
-
-## Production Deployment
-
-### Railway (Recommended)
-1. Connect GitHub repository
-2. Add environment variables
-3. Deploy automatically
-
-### Manual Deployment
+### Available Scripts
 ```bash
-npm run build
-npm start
+npm run dev          # Start development server (tsx watch)
+npm run build        # Build for production (TypeScript → JavaScript)
+npm run start        # Start production server
+npm test             # Run Jest tests
+npm run test:watch   # Run tests in watch mode
+npm run test:coverage # Generate coverage report
+npm run lint         # Run ESLint
+npm run lint:fix     # Fix ESLint issues
+npx prisma studio    # Open Prisma Studio (database GUI)
+npm run seed         # Seed database with test user
 ```
 
-## Testing
+### Project Structure
+```
+backend/
+├── src/
+│   ├── config/              # Configuration files
+│   │   ├── index.ts         # Environment variables
+│   │   └── database.ts      # Prisma client setup
+│   ├── middleware/          # Express middleware
+│   │   ├── auth.ts          # JWT authentication
+│   │   ├── errorHandler.ts # Global error handling
+│   │   ├── requestLogger.ts # HTTP request logging
+│   │   ├── requestTimeout.ts # Request timeout handling
+│   │   └── healthMonitor.ts # Health monitoring
+│   ├── routes/              # API route definitions
+│   │   ├── auth.ts          # Authentication endpoints
+│   │   ├── contacts.ts      # Contact management
+│   │   ├── places.ts        # Google Places integration
+│   │   ├── ai-chat.ts       # AI chat endpoints
+│   │   ├── speech.ts        # Azure Speech endpoints
+│   │   ├── telnyx.ts        # Telnyx phone system
+│   │   ├── autopilot-hybrid.ts # AI autopilot system
+│   │   └── admin/           # Admin-only endpoints
+│   ├── services/            # Business logic layer
+│   │   ├── azureOpenAI.ts   # Azure OpenAI integration
+│   │   ├── azureSpeech.ts   # Azure Speech Services
+│   │   ├── googlePlaces.ts  # Google Places API
+│   │   ├── telnyx.ts        # Telnyx API wrapper
+│   │   ├── voiceCallHandler.ts # Voice call orchestration
+│   │   ├── costTracking.ts  # API cost monitoring
+│   │   └── email.ts         # Email service
+│   ├── utils/               # Utility functions
+│   │   └── logger.ts        # Winston logger
+│   └── server.ts            # Express app entry point
+├── prisma/
+│   ├── schema.prisma        # Database schema
+│   ├── migrations/          # Database migrations
+│   └── dev.db              # SQLite database (gitignored)
+├── tests/                   # Jest test files
+├── public/                  # Static files (AI chat HTML)
+└── logs/                    # Application logs (gitignored)
+```
+
+### Adding New Features
+1. **Create route:** Add file in `src/routes/`
+2. **Add business logic:** Create service in `src/services/`
+3. **Update types:** Add TypeScript types in route file
+4. **Register route:** Import in `src/server.ts`
+5. **Add tests:** Create test in `tests/`
+
+---
+
+## 🧪 Testing
 
 ```bash
 # Run all tests
 npm test
 
 # Run specific test file
-npm test auth.test.ts
+npm test health.test.ts
 
-# Watch mode
-npm test -- --watch
+# Watch mode (re-run on changes)
+npm run test:watch
+
+# Coverage report
+npm run test:coverage
 ```
 
-## Monitoring
+**Test Files:**
+- `tests/health.test.ts` - Health endpoint tests
+- `tests/telnyx.test.ts` - Telnyx integration tests
+- `tests/setup.ts` - Test configuration
 
-The application includes:
-- Winston logging
-- Request/response logging
-- Error tracking
-- Health checks
-- Metrics collection
+---
 
-## Security
+## 📊 Monitoring & Logging
 
-- JWT authentication
-- Role-based permissions
-- Rate limiting
-- CORS protection
-- Helmet security headers
-- Input validation
-- SQL injection prevention
+### Winston Logging
+Logs are written to:
+- **Console:** All environments
+- **File:** `logs/app.log` (production)
+- **Error File:** `logs/error.log` (errors only)
+
+**Log Levels:**
+- `error` - System failures, unhandled errors
+- `warn` - Deprecated features, high API costs
+- `info` - Important events, API calls
+- `debug` - Detailed debugging (development only)
+
+### Health Monitoring
+- **Basic:** `GET /api/health` - Server uptime, status
+- **Database:** `GET /api/health/db` - Database connectivity
+- **Detailed:** `GET /api/health/detailed` - All services + metrics
+
+### Cost Tracking
+API usage is automatically tracked in `ApiUsage` table:
+- Azure OpenAI costs
+- Azure Speech costs
+- Telnyx call costs
+- Daily/monthly spending reports
+
+---
+
+## 🔐 Security
+
+### Implemented Security Features
+- ✅ **JWT Authentication** - Access & refresh tokens
+- ✅ **Password Hashing** - bcryptjs with salt rounds
+- ✅ **Rate Limiting** - 100 requests per 15 minutes
+- ✅ **CORS Protection** - Configurable origins
+- ✅ **Helmet Security Headers** - XSS, CSP, HSTS
+- ✅ **Input Validation** - express-validator
+- ✅ **SQL Injection Prevention** - Prisma ORM parameterized queries
+- ✅ **Error Handling** - No sensitive data in error responses
+- ✅ **Request Timeouts** - Prevent hanging connections
+- ✅ **Health Monitoring** - Error rate tracking
+
+### Best Practices
+1. **Environment Variables:** Never commit secrets to Git
+2. **JWT Secrets:** Minimum 32 characters, use `openssl rand -base64 32`
+3. **Database:** Use connection pooling in production
+4. **API Keys:** Store in environment variables, not code
+5. **HTTPS:** Always use HTTPS in production
+6. **CORS:** Whitelist specific origins, not wildcard `*`
+
+---
+
+## 🚀 Production Deployment
+
+### Deploy to Azure Container Apps
+
+1. **Build Docker image:**
+   ```bash
+   docker build -t powerful-crm-backend .
+   ```
+
+2. **Push to Azure Container Registry:**
+   ```bash
+   az acr login --name yourregistry
+   docker tag powerful-crm-backend yourregistry.azurecr.io/powerful-crm-backend
+   docker push yourregistry.azurecr.io/powerful-crm-backend
+   ```
+
+3. **Deploy to Container Apps:**
+   ```bash
+   az containerapp create \
+     --name powerful-crm-backend \
+     --resource-group powerful-crm-rg \
+     --image yourregistry.azurecr.io/powerful-crm-backend \
+     --target-port 8000 \
+     --ingress external \
+     --env-vars $(cat .env.production)
+   ```
+
+### Deploy to Railway
+
+1. Connect GitHub repository
+2. Add environment variables from `.env.example`
+3. Deploy automatically on push to master
+
+### Environment Variables for Production
+See `GITHUB_SECRETS.md` for complete list of required secrets.
+
+---
+
+## 🆘 Troubleshooting
+
+### "Cannot find module '@prisma/client'"
+```bash
+npx prisma generate
+```
+
+### "Database connection failed"
+- Check `DATABASE_URL` format
+- Ensure database server is running
+- Verify credentials are correct
+
+### "JWT token invalid"
+- Ensure `JWT_SECRET` is set and minimum 32 characters
+- Same secret must be used for signing and verification
+
+### "Port 8000 already in use"
+```bash
+# Find process using port (PowerShell)
+netstat -ano | findstr :8000
+
+# Kill process
+taskkill /PID <PID> /F
+
+# Or change PORT in .env
+```
+
+### "Azure OpenAI authentication failed"
+- Verify `AZURE_OPENAI_KEY` is correct
+- Check `AZURE_OPENAI_ENDPOINT` ends with trailing slash
+- Ensure `AZURE_OPENAI_DEPLOYMENT` name matches Azure deployment
+
+---
+
+## 📚 Additional Documentation
+
+- **[Main README](../README.md)** - Project overview
+- **[GITHUB_SECRETS.md](../GITHUB_SECRETS.md)** - GitHub secrets configuration
+- **[docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)** - System architecture
+- **[docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md)** - Development guide
+- **[docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md)** - Deployment guide
+
+---
+
+**Developed by:** Eli Ize (ST10129307)  
+**Last Updated:** January 2025

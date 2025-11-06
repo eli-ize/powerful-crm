@@ -29,8 +29,14 @@ This folder contains all consolidated documentation for the Powerful CRM project
 
 1. **[ARCHITECTURE.md](ARCHITECTURE.md)** - Understand what we're building
 2. **[DEVELOPMENT.md](DEVELOPMENT.md)** - Set up your local environment
-3. **[TESTING.md](TESTING.md)** - Run zero-cost tests before using phone calls
-4. **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deploy to production when ready
+3. **[Main README](../README.md)** - Test credentials and installation steps
+4. **[TESTING.md](TESTING.md)** - Run zero-cost tests before using phone calls
+5. **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deploy to production when ready
+
+**Test Credentials (Local Development):**
+- Email: `test@powerfulcrm.com`
+- Password: `test123`
+- Generated automatically with `npm run seed`
 
 ---
 
@@ -60,11 +66,17 @@ This folder contains all consolidated documentation for the Powerful CRM project
 # Start here for local setup
 docs/DEVELOPMENT.md
 
+# Main project README with test credentials
+README.md
+
 # Understand the architecture
 docs/ARCHITECTURE.md
 
 # Test without spending money
 docs/TESTING.md → Use ai-chat-tester.html
+
+# GitHub Secrets for CI/CD
+GITHUB_SECRETS.md
 
 # Troubleshoot issues
 docs/TROUBLESHOOTING.md
@@ -74,6 +86,9 @@ docs/TROUBLESHOOTING.md
 ```bash
 # Production deployment
 docs/DEPLOYMENT.md
+
+# GitHub Actions secrets configuration
+GITHUB_SECRETS.md
 
 # Security hardening
 docs/SECURITY.md
@@ -98,15 +113,18 @@ docs/ARCHITECTURE.md
 
 ## 🔄 Documentation Maintenance
 
-**Last Consolidated:** 2025
+**Last Updated:** January 2025  
+**Developed By:** Eli Ize (ST10129307)  
 **Status:** All documentation consolidated from 114+ files → 8 core guides
 
-### Changelog
+### Recent Updates
 - **2025-01:** Complete documentation consolidation
   - Merged 90+ redundant files
   - Removed outdated setup guides
   - Created single source of truth per topic
   - Eliminated conflicting information
+  - Added GitHub Secrets guide for CI/CD
+  - Updated all credentials to test@powerfulcrm.com/test123
 
 ### Contributing to Docs
 When adding documentation:
@@ -122,16 +140,12 @@ When adding documentation:
 **Can't find what you need?**
 
 1. Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) first
-2. Search the [GitHub Issues](https://github.com/yourorg/powerful-crm/issues)
-3. Contact the development team
+2. Review [Main README](../README.md) for test credentials and setup
+3. Check [GITHUB_SECRETS.md](../GITHUB_SECRETS.md) for deployment configuration
+4. Search the [GitHub Repository](https://github.com/eli-ize/powerful-crm)
 
 ---
 
-## 📝 License
-
-See [LICENSE](../LICENSE) for details.
-
----
-
-**Last Updated:** 2025
-**Maintained By:** Powerful CRM Development Team
+**Last Updated:** January 2025  
+**Developed By:** Eli Ize (ST10129307)  
+**Repository:** https://github.com/eli-ize/powerful-crm
