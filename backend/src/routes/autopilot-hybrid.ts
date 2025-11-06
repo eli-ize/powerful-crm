@@ -1100,7 +1100,8 @@ router.post('/execute/send-emails', [
             const customFields = JSON.parse(contact.customFields);
             websiteAnalysis = customFields.websiteAnalysis;
           } catch (e) {
-            // No analysis available
+            // Ignore JSON parse errors - no analysis available
+            logger.debug('Failed to parse customFields for website analysis');
           }
         }
 
@@ -1494,12 +1495,12 @@ router.get('/analytics/roi', [
           tasksCompleted,
           estimatedRevenue,
           totalCost,
-          roi: parseFloat(roi)
+          roi: Number.parseFloat(roi)
         },
         metrics: {
-          conversionRate: parseFloat(conversionRate),
-          callAnswerRate: parseFloat(callAnswerRate),
-          dealCloseRate: parseFloat(dealCloseRate),
+          conversionRate: Number.parseFloat(conversionRate),
+          callAnswerRate: Number.parseFloat(callAnswerRate),
+          dealCloseRate: Number.parseFloat(dealCloseRate),
           avgDealValue: dealsCreated > 0 ? (estimatedRevenue / dealsCreated).toFixed(2) : '0.00',
           costPerLead: costPerLead.toFixed(2),
           revenuePerLead: totalLeads > 0 ? (estimatedRevenue / totalLeads).toFixed(2) : '0.00'

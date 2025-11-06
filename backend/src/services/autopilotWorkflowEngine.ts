@@ -1,8 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger';
 import googlePlacesService from './googlePlaces';
-import { VoiceCallHandler } from './voiceCallHandler';
-import azureOpenAI from './azureOpenAI';
 
 const prisma = new PrismaClient();
 
@@ -13,7 +11,7 @@ export interface WorkflowStep {
 }
 
 export class AutopilotWorkflowEngine {
-  private activeWorkflows: Map<string, boolean> = new Map();
+  private readonly activeWorkflows: Map<string, boolean> = new Map();
 
   async startAutopilot(configId: string): Promise<string> {
     try {

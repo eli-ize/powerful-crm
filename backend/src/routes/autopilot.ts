@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import { body, query, validationResult } from 'express-validator';
 import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger';
-import autopilotWorkflowEngine from '../services/autopilotWorkflowEngine';
 
 const router = Router();
 const prisma = new PrismaClient();
