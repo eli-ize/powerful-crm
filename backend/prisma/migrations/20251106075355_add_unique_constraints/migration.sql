@@ -253,6 +253,30 @@ CREATE TABLE "system_config" (
 );
 
 -- CreateTable
+CREATE TABLE "user_config" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "dailySpendingLimit" REAL DEFAULT 10.0,
+    "monthlySpendingLimit" REAL DEFAULT 100.0,
+    "perCallLimit" REAL DEFAULT 2.0,
+    "maxCallDuration" INTEGER DEFAULT 300,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "user_config_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "api_usage" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "service" TEXT NOT NULL,
+    "operation" TEXT NOT NULL,
+    "cost" REAL NOT NULL,
+    "metadata" TEXT,
+    "userId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
 CREATE TABLE "jobs" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "type" TEXT NOT NULL,
@@ -270,11 +294,71 @@ CREATE TABLE "jobs" (
     "updatedAt" DATETIME NOT NULL
 );
 
+-- CreateTable
+CREATE TABLE "autopilot_configs" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "name" TEXT NOT NULL DEFAULT 'Default Autopilot',
+    "industry" TEXT NOT NULL DEFAULT 'web_design',
+    "isActive" BOOLEAN NOT NULL DEFAULT false,
+    "config" TEXT NOT NULL DEFAULT '{}',
+    "totalLeadsFound" INTEGER NOT NULL DEFAULT 0,
+    "totalCallsMade" INTEGER NOT NULL DEFAULT 0,
+    "totalMeetingsBooked" INTEGER NOT NULL DEFAULT 0,
+    "totalRevenue" REAL NOT NULL DEFAULT 0,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "autopilot_configs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "autopilot_tasks" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "configId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "progress" INTEGER NOT NULL DEFAULT 0,
+    "inputData" TEXT,
+    "resultData" TEXT,
+    "errorMessage" TEXT,
+    "assignedTo" TEXT,
+    "startedAt" DATETIME,
+    "completedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "autopilot_tasks_configId_fkey" FOREIGN KEY ("configId") REFERENCES "autopilot_configs" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "autopilot_workflows" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "configId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "steps" TEXT NOT NULL,
+    "currentStep" INTEGER NOT NULL DEFAULT 0,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "totalSteps" INTEGER NOT NULL DEFAULT 0,
+    "progress" INTEGER NOT NULL DEFAULT 0,
+    "resultData" TEXT,
+    "startedAt" DATETIME,
+    "completedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "autopilot_workflows_configId_fkey" FOREIGN KEY ("configId") REFERENCES "autopilot_configs" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "refresh_tokens_token_key" ON "refresh_tokens"("token");
+
+-- CreateIndex
+CREATE INDEX "idx_custom_fields" ON "contacts"("customFields");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "contacts_company_createdBy_key" ON "contacts"("company", "createdBy");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "campaign_contacts_campaignId_contactId_key" ON "campaign_contacts"("campaignId", "contactId");
@@ -284,3 +368,6 @@ CREATE UNIQUE INDEX "call_logs_telnyxCallId_key" ON "call_logs"("telnyxCallId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "system_config_key_key" ON "system_config"("key");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_config_userId_key" ON "user_config"("userId");

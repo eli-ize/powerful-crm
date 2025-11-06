@@ -83,6 +83,9 @@ model Contact {
   tags        String?  // Comma-separated tags
   customFields String? // JSON string
   
+  // Google Places Lead Finder integration
+  placeId     String?  // Google Place ID for deduplication
+  
   // Lead qualification
   qualificationCategory String?
   qualificationReason   String?
@@ -103,6 +106,9 @@ model Contact {
   tasks      Task[]
   campaignContacts CampaignContact[]
 
+  @@unique([placeId], name: "unique_place_id")
+  @@index([company, phone], name: "idx_company_phone")
+  @@index([company, email], name: "idx_company_email")
   @@map("contacts")
 }
 

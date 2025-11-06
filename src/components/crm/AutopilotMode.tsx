@@ -13,21 +13,18 @@ import {
   CheckCircle,
   Clock,
   Users,
-  Mail,
   Phone as PhoneIcon,
   Search,
   Tag,
   Bot,
-  FileText,
   Image as ImageIcon,
   Send,
-  AlertCircle,
   TrendingUp,
   Target
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '../ui/progress';
-import { autopilotAPI, DEFAULT_AUTOPILOT_CONFIG, AutopilotConfig, AutopilotTask, AutopilotStatus } from '../../services/autopilotAPI';
+import { autopilotAPI, DEFAULT_AUTOPILOT_CONFIG, AutopilotConfig, AutopilotTask } from '../../services/autopilotAPI';
 
 // Types imported from autopilotAPI service
 
@@ -35,7 +32,6 @@ export function AutopilotMode() {
   const [isActive, setIsActive] = useState(false);
   const [config, setConfig] = useState<AutopilotConfig>(DEFAULT_AUTOPILOT_CONFIG);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiConnected, setApiConnected] = useState(false);
   const [tasks, setTasks] = useState<AutopilotTask[]>([]);
 
   // Initialize component with API data
@@ -44,7 +40,6 @@ export function AutopilotMode() {
       try {
         // Test API connection
         const connected = await autopilotAPI.testConnection();
-        setApiConnected(connected);
         
         if (connected) {
           // Load existing configuration
@@ -176,7 +171,7 @@ export function AutopilotMode() {
     return labels[type] || type;
   };
 
-  const getStatusColor = (status: string) => {
+    const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: 'bg-gray-100 text-gray-800 border-gray-300',
       in_progress: 'bg-blue-100 text-blue-800 border-blue-300',
@@ -184,6 +179,20 @@ export function AutopilotMode() {
       failed: 'bg-red-100 text-red-800 border-red-300',
     };
     return colors[status] || colors.pending;
+  };
+
+  const getTaskBackgroundColor = (status: string) => {
+    if (status === 'completed') return 'bg-green-100';
+    if (status === 'in_progress') return 'bg-blue-100';
+    if (status === 'failed') return 'bg-red-100';
+    return 'bg-gray-100';
+  };
+
+  const getTaskIconColor = (status: string) => {
+    if (status === 'completed') return 'text-green-600';
+    if (status === 'in_progress') return 'text-blue-600';
+    if (status === 'failed') return 'text-red-600';
+    return 'text-gray-600';
   };
 
   return (
@@ -313,7 +322,7 @@ export function AutopilotMode() {
             <CardContent className="space-y-4">
               <div>
                 <Label className="mb-2 block">Industry</Label>
-                <Select value={config.industry} onValueChange={(value) => setConfig({ ...config, industry: value })}>
+                <Select value={config.industry} onValueChange={(value: string) => setConfig({ ...config, industry: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -334,7 +343,7 @@ export function AutopilotMode() {
                   </div>
                   <Switch
                     checked={config.leadFinding.enabled}
-                    onCheckedChange={(checked) => setConfig({
+                    onCheckedChange={(checked: boolean) => setConfig({
                       ...config,
                       leadFinding: { ...config.leadFinding, enabled: checked }
                     })}
@@ -348,7 +357,7 @@ export function AutopilotMode() {
                   </div>
                   <Switch
                     checked={config.qualification.websiteAnalysis}
-                    onCheckedChange={(checked) => setConfig({
+                    onCheckedChange={(checked: boolean) => setConfig({
                       ...config,
                       qualification: { ...config.qualification, websiteAnalysis: checked }
                     })}
@@ -362,7 +371,7 @@ export function AutopilotMode() {
                   </div>
                   <Switch
                     checked={config.calling.enabled}
-                    onCheckedChange={(checked) => setConfig({
+                    onCheckedChange={(checked: boolean) => setConfig({
                       ...config,
                       calling: { ...config.calling, enabled: checked }
                     })}
@@ -376,7 +385,7 @@ export function AutopilotMode() {
                   </div>
                   <Switch
                     checked={config.taskAssignment.enabled}
-                    onCheckedChange={(checked) => setConfig({
+                    onCheckedChange={(checked: boolean) => setConfig({
                       ...config,
                       taskAssignment: { ...config.taskAssignment, enabled: checked }
                     })}
@@ -390,7 +399,7 @@ export function AutopilotMode() {
                   </div>
                   <Switch
                     checked={config.emailAutomation.enabled}
-                    onCheckedChange={(checked) => setConfig({
+                    onCheckedChange={(checked: boolean) => setConfig({
                       ...config,
                       emailAutomation: { ...config.emailAutomation, enabled: checked }
                     })}
@@ -424,16 +433,8 @@ export function AutopilotMode() {
                     <div key={task.id} className="p-4 border border-gray-200 rounded-lg">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                            task.status === 'completed' ? 'bg-green-100' :
-                            task.status === 'in_progress' ? 'bg-blue-100' :
-                            task.status === 'failed' ? 'bg-red-100' : 'bg-gray-100'
-                          }`}>
-                            <Icon className={`h-5 w-5 ${
-                              task.status === 'completed' ? 'text-green-600' :
-                              task.status === 'in_progress' ? 'text-blue-600' :
-                              task.status === 'failed' ? 'text-red-600' : 'text-gray-600'
-                            }`} />
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getTaskBackgroundColor(task.status)}`}>
+                            <Icon className={`h-5 w-5 ${getTaskIconColor(task.status)}`} />
                           </div>
                           <div>
                             <h4 className="font-medium text-gray-900">{getTaskLabel(task.type)}</h4>

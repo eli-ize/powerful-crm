@@ -99,7 +99,7 @@ class AutopilotAPI {
       const response = await this.fetchAPI('/autopilot/config');
       return response.data || null;
     } catch (error) {
-      console.warn('No autopilot config found, using defaults');
+      console.warn('No autopilot config found, using defaults:', error);
       return null;
     }
   }

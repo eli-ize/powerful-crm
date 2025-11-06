@@ -74,11 +74,11 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
       try {
         const response = await api.getContacts();
         if (response.success && response.data) {
-          // Extract place IDs from contacts that have them in customFields
+          // Extract place IDs from contacts that have them
           const savedFromDB = response.data
-            .filter((contact: any) => contact.customFields?.placeId)
+            .filter((contact: any) => contact.placeId) // Use dedicated placeId column
             .map((contact: any) => ({
-              placeId: contact.customFields.placeId,
+              placeId: contact.placeId,
               company: contact.company || contact.firstName + ' ' + contact.lastName,
               savedAt: contact.createdAt || new Date().toISOString(),
             }));
@@ -164,6 +164,12 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
   };
 
   const handleSaveContact = async (place: Place) => {
+    // Check if already saved before attempting to save
+    if (isContactSaved(place.place_id)) {
+      toast.info(`${place.name} is already in your CRM`);
+      return;
+    }
+
     setSavingIds(prev => new Set(prev).add(place.place_id));
 
     try {
@@ -176,8 +182,8 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
         location: place.formatted_address,
         source: 'Google Places - Lead Finder',
         status: 'new',
+        placeId: place.place_id, // Use dedicated column for unique constraint
         customFields: {
-          placeId: place.place_id,
           rating: place.rating,
           totalRatings: place.user_ratings_total,
           businessStatus: place.business_status,
@@ -195,11 +201,7 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
           savedAt: new Date().toISOString(),
         };
 
-        const updated = [...savedContacts, newSaved];
-        setSavedContacts(updated);
-        
-        // Also save to localStorage as backup
-        localStorage.setItem('crm_saved_place_ids', JSON.stringify(updated));
+        setSavedContacts(prev => [...prev, newSaved]);
 
         toast.success(`✅ ${place.name} saved to CRM!`);
         
@@ -257,14 +259,6 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
     setSelectedPlaces(next);
   };
 
-  const toggleSelectAll = () => {
-    if (selectedPlaces.size === filteredResults.length) {
-      setSelectedPlaces(new Set());
-    } else {
-      setSelectedPlaces(new Set(filteredResults.map(r => r.place_id)));
-    }
-  };
-
   const filteredResults = hideImported 
     ? results.filter(r => !isContactSaved(r.place_id))
     : results;
@@ -317,6 +311,15 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
   const endIndex = startIndex + resultsPerPage;
   const paginatedResults = filteredAndSortedResults.slice(startIndex, endIndex);
 
+  // Toggle select all - now with correct filtered results
+  const toggleSelectAll = () => {
+    if (selectedPlaces.size === filteredAndSortedResults.length) {
+      setSelectedPlaces(new Set());
+    } else {
+      setSelectedPlaces(new Set(filteredAndSortedResults.map(r => r.place_id)));
+    }
+  };
+
   // Reset to page 1 when search results change
   useEffect(() => {
     setCurrentPage(1);
@@ -349,9 +352,10 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
               variant="outline"
               size="sm"
               onClick={() => setShowFilters(!showFilters)}
+              className="border-gray-300 hover:bg-gray-50 font-medium"
             >
               <SlidersHorizontal className="mr-2 h-4 w-4" />
-              {showFilters ? 'Hide' : 'Show'} Filters
+              {showFilters ? 'Hide' : 'Show'} Advanced Filters
             </Button>
           </div>
         </CardHeader>
@@ -530,15 +534,19 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
               </div>
             </div>
 
-            <Button onClick={handleSearch} disabled={isSearching} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+            <Button 
+              onClick={handleSearch} 
+              disabled={isSearching} 
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md w-full sm:w-auto font-medium h-11"
+            >
               {isSearching ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Searching...
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Searching Google Places...
                 </>
               ) : (
                 <>
-                  <Search className="mr-2 h-4 w-4" />
+                  <Search className="mr-2 h-5 w-5" />
                   Find Leads
                 </>
               )}
@@ -576,17 +584,23 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
                   {selectedPlaces.size} selected • {savedContacts.length} already in CRM
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={toggleSelectAll}
+                  className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 font-medium"
+                >
                   {selectedPlaces.size === filteredAndSortedResults.length ? 'Deselect All' : 'Select All'}
                 </Button>
                 <Button 
                   onClick={handleBulkSave} 
                   disabled={selectedPlaces.size === 0}
-                  className="bg-green-600 hover:bg-green-700"
+                  size="sm"
+                  className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Save {selectedPlaces.size} to CRM
+                  Import {selectedPlaces.size > 0 ? selectedPlaces.size : ''} Contact{selectedPlaces.size !== 1 ? 's' : ''}
                 </Button>
               </div>
             </div>
@@ -606,7 +620,17 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
                         <div className="flex items-start gap-3 flex-1">
                           <Checkbox
                             checked={isSelected}
-                            onCheckedChange={() => toggleSelection(place.place_id)}
+                            onCheckedChange={(checked: boolean) => {
+                              if (checked) {
+                                setSelectedPlaces(prev => new Set(prev).add(place.place_id));
+                              } else {
+                                setSelectedPlaces(prev => {
+                                  const next = new Set(prev);
+                                  next.delete(place.place_id);
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={isSaved}
                           />
                           <div className="flex-1 space-y-2">
@@ -662,7 +686,11 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
                           size="sm"
                           onClick={() => handleSaveContact(place)}
                           disabled={isSaved || isSaving}
-                          className={isSaved ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'}
+                          className={
+                            isSaved 
+                              ? 'bg-green-600 hover:bg-green-600 cursor-default shadow-sm' 
+                              : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-sm font-medium'
+                          }
                         >
                           {isSaving ? (
                             <>
@@ -672,12 +700,12 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
                           ) : isSaved ? (
                             <>
                               <CheckCircle className="mr-2 h-4 w-4" />
-                              Saved
+                              In CRM
                             </>
                           ) : (
                             <>
                               <Plus className="mr-2 h-4 w-4" />
-                              Save
+                              Add to CRM
                             </>
                           )}
                         </Button>
@@ -701,6 +729,7 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
                     size="sm"
                     onClick={() => goToPage(currentPage - 1)}
                     disabled={currentPage === 1}
+                    className="border-gray-300 hover:bg-gray-50 font-medium"
                   >
                     <ChevronLeft className="h-4 w-4 mr-1" />
                     Previous
@@ -710,7 +739,12 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
                   <div className="flex gap-1">
                     {currentPage > 2 && (
                       <>
-                        <Button variant="outline" size="sm" onClick={() => goToPage(1)}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => goToPage(1)}
+                          className="border-gray-300 hover:bg-gray-50"
+                        >
                           1
                         </Button>
                         {currentPage > 3 && <span className="px-2 py-1">...</span>}
@@ -718,17 +752,31 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
                     )}
 
                     {currentPage > 1 && (
-                      <Button variant="outline" size="sm" onClick={() => goToPage(currentPage - 1)}>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => goToPage(currentPage - 1)}
+                        className="border-gray-300 hover:bg-gray-50"
+                      >
                         {currentPage - 1}
                       </Button>
                     )}
 
-                    <Button variant="default" size="sm" className="bg-blue-600">
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="bg-blue-600 hover:bg-blue-700 font-medium shadow-sm"
+                    >
                       {currentPage}
                     </Button>
 
                     {currentPage < totalPages && (
-                      <Button variant="outline" size="sm" onClick={() => goToPage(currentPage + 1)}>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => goToPage(currentPage + 1)}
+                        className="border-gray-300 hover:bg-gray-50"
+                      >
                         {currentPage + 1}
                       </Button>
                     )}
@@ -736,7 +784,12 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
                     {currentPage < totalPages - 1 && (
                       <>
                         {currentPage < totalPages - 2 && <span className="px-2 py-1">...</span>}
-                        <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => goToPage(totalPages)}
+                          className="border-gray-300 hover:bg-gray-50"
+                        >
                           {totalPages}
                         </Button>
                       </>
@@ -748,6 +801,7 @@ export function LeadFinder({ onNavigate, onContactSaved }: LeadFinderProps) {
                     size="sm"
                     onClick={() => goToPage(currentPage + 1)}
                     disabled={currentPage === totalPages}
+                    className="border-gray-300 hover:bg-gray-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
                     <ChevronRight className="h-4 w-4 ml-1" />
