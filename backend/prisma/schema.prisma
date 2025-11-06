@@ -1,7 +1,6 @@
 // Database Configuration
-// Currently using Azure SQL Server (Europe) - 150-180ms latency
-// Recommended: Migrate to Azure PostgreSQL (Johannesburg) for 5-15ms latency
-// See AZURE_POSTGRESQL_SA.md for migration guide
+// Currently using Azure SQL Server
+// Connection configured via DATABASE_URL environment variable
 
 generator client {
   provider = "prisma-client-js"
@@ -13,7 +12,7 @@ generator erd {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "sqlserver"
   url      = env("DATABASE_URL")
 }
 

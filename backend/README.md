@@ -165,7 +165,26 @@ See `.env.example` for complete configuration options.
 ## 🗄️ Database
 
 **Development:** SQLite (file: `./prisma/dev.db`)  
-**Production:** PostgreSQL (recommended)
+**Production:** Azure SQL Server or PostgreSQL
+
+### Quick Database Toggle
+
+**Switch between SQLite and Azure SQL:**
+```powershell
+# Check current database
+.\toggle-database.ps1 status
+
+# Switch to SQLite (local, free, fast)
+.\toggle-database.ps1 sqlite
+
+# Switch to Azure SQL (cloud, production)
+.\toggle-database.ps1 azuresql
+```
+
+**Activate paused Azure SQL Database:**
+```powershell
+.\activate-azure-sql.ps1
+```
 
 ### Database Schema
 
