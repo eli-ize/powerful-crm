@@ -12,7 +12,7 @@ import { Analytics } from '../components/crm/Analytics';
 import { Automation } from '../components/crm/Automation';
 import { Templates } from '../components/crm/Templates';
 import { Goals } from '../components/crm/Goals';
-import { LeadFinder } from '../components/crm/LeadFinder';
+import LeadFinderNew from '../components/crm/LeadFinderNew';
 import { LeadQualification } from '../components/crm/LeadQualification';
 import { Campaigns } from '../components/crm/Campaigns';
 import { VirtualAgents } from '../components/crm/VirtualAgents';
@@ -41,7 +41,7 @@ export function AppRoutes() {
       <Route path="/phone" element={<Phone />} />
       
       {/* Lead Generation */}
-      <Route path="/leadfinder" element={<LeadFinder />} />
+      <Route path="/leadfinder" element={<LeadFinderNew />} />
       <Route path="/qualification" element={<LeadQualification />} />
       <Route path="/industry-templates" element={<IndustryTemplates />} />
       <Route path="/website-analyzer" element={<WebsiteAnalyzer />} />

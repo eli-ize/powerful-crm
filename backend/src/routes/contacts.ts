@@ -63,6 +63,8 @@ router.post('/', async (req: Request, res: Response) => {
         source: contactData.source,
         title: contactData.title,
         tags: contactData.tags,
+        placeId: contactData.placeId, // Google Places ID for deduplication
+        customFields: contactData.customFields ? JSON.stringify(contactData.customFields) : undefined,
       },
       include: {
         user: {
@@ -78,8 +80,18 @@ router.post('/', async (req: Request, res: Response) => {
       success: true,
       data: contact,
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error creating contact:', error);
+    
+    // Handle unique constraint violation
+    if (error.code === 'P2002' && error.meta?.target?.includes('placeId')) {
+      return res.status(409).json({
+        success: false,
+        error: 'This business has already been added to your CRM',
+        code: 'DUPLICATE_PLACE_ID',
+      });
+    }
+    
     res.status(500).json({
       success: false,
       error: 'Failed to create contact',
